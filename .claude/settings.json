@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv init:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(uv add:*)",
+      "Bash(uv run ruff format:*)",
+      "Bash(uv run ruff:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7"
+  ]
+}
