@@ -1,0 +1,3 @@
+[submodule "External/xed"]
+	path = External/xed
+	url = https://github.com/intelxed/xed.git

@@ -1,9 +1,13 @@
 """ISA MCP Server implementation."""
 
+import logging
+from pathlib import Path
 from typing import List, Optional
 
 from fastmcp import FastMCP
 from pydantic import BaseModel
+
+from .isa_database import ISADatabase
 
 
 class InstructionInfo(BaseModel):
@@ -30,10 +34,27 @@ class ArchitectureInfo(BaseModel):
 
 mcp = FastMCP("ISA MCP Server")
 
+# Initialize database
+db = ISADatabase("isa_docs.db")
+try:
+    db.initialize_database()
+except Exception as e:
+    logging.warning(f"Failed to initialize database: {e}")
+    db = None
+
 
 @mcp.resource("isa://architectures")
 async def list_architectures() -> str:
     """List all supported instruction set architectures."""
+    if db:
+        try:
+            architectures = db.get_supported_isas()
+            if architectures:
+                return "\n".join(f"- {arch}" for arch in architectures)
+        except Exception as e:
+            logging.warning(f"Failed to get architectures from database: {e}")
+    
+    # Fallback to hardcoded data
     architectures = ["x86_64", "x86_32", "AArch64"]
     return "\n".join(f"- {arch}" for arch in architectures)
 
@@ -106,57 +127,39 @@ Addressing Modes: {", ".join(arch.addressing_modes)}"""
 @mcp.resource("isa://instructions/{arch}")
 async def list_instructions(arch: str) -> str:
     """List instructions for a specific architecture."""
+    if db:
+        try:
+            # Map common architecture names
+            arch_mapping = {
+                "x86_64": "x86",
+                "x86_32": "x86",
+                "AArch64": "aarch64"
+            }
+            
+            db_arch = arch_mapping.get(arch, arch)
+            instructions = db.list_instructions(db_arch, limit=100)
+            
+            if instructions:
+                # Get unique mnemonics
+                mnemonics = list(set(instr.mnemonic for instr in instructions))
+                mnemonics.sort()
+                return "\n".join(f"- {instr}" for instr in mnemonics)
+        except Exception as e:
+            logging.warning(f"Failed to get instructions from database: {e}")
+    
+    # Fallback to hardcoded data
     instruction_sets = {
         "x86_64": [
-            "MOV",
-            "ADD",
-            "SUB",
-            "MUL",
-            "DIV",
-            "JMP",
-            "CMP",
-            "PUSH",
-            "POP",
-            "CALL",
-            "RET",
-            "LEA",
-            "XOR",
-            "AND",
-            "OR",
+            "MOV", "ADD", "SUB", "MUL", "DIV", "JMP", "CMP", "PUSH", "POP", 
+            "CALL", "RET", "LEA", "XOR", "AND", "OR"
         ],
         "x86_32": [
-            "MOV",
-            "ADD",
-            "SUB",
-            "MUL",
-            "DIV",
-            "JMP",
-            "CMP",
-            "PUSH",
-            "POP",
-            "CALL",
-            "RET",
-            "LEA",
-            "XOR",
-            "AND",
-            "OR",
+            "MOV", "ADD", "SUB", "MUL", "DIV", "JMP", "CMP", "PUSH", "POP", 
+            "CALL", "RET", "LEA", "XOR", "AND", "OR"
         ],
         "AArch64": [
-            "MOV",
-            "ADD",
-            "SUB",
-            "MUL",
-            "LDR",
-            "STR",
-            "B",
-            "CMP",
-            "BL",
-            "RET",
-            "CBZ",
-            "CBNZ",
-            "AND",
-            "ORR",
-            "EOR",
+            "MOV", "ADD", "SUB", "MUL", "LDR", "STR", "B", "CMP", "BL", 
+            "RET", "CBZ", "CBNZ", "AND", "ORR", "EOR"
         ],
     }
 
@@ -170,6 +173,36 @@ async def list_instructions(arch: str) -> str:
 @mcp.resource("isa://instruction/{arch}/{name}")
 async def get_instruction_info(arch: str, name: str) -> str:
     """Get detailed information about a specific instruction."""
+    if db:
+        try:
+            # Map common architecture names
+            arch_mapping = {
+                "x86_64": "x86",
+                "x86_32": "x86",
+                "AArch64": "aarch64"
+            }
+            
+            db_arch = arch_mapping.get(arch, arch)
+            instruction = db.get_instruction(db_arch, name.upper())
+            
+            if instruction:
+                # Convert operands to string list
+                operand_types = [op.type for op in instruction.operands]
+                
+                # Generate examples (placeholder)
+                examples = [f"{name} example1", f"{name} example2"]
+                
+                return f"""Instruction: {instruction.mnemonic}
+Description: {instruction.description}
+Syntax: {instruction.syntax}
+Operands: {", ".join(operand_types)}
+Flags Affected: {", ".join(instruction.flags_affected) if instruction.flags_affected else "None"}
+Examples:
+{chr(10).join(f"  {ex}" for ex in examples)}"""
+        except Exception as e:
+            logging.warning(f"Failed to get instruction from database: {e}")
+    
+    # Fallback to hardcoded data
     instructions = {
         "x86_64": {
             "MOV": InstructionInfo(
@@ -270,6 +303,29 @@ Examples:
 @mcp.tool("search_instructions")
 async def search_instructions(query: str, architecture: Optional[str] = None) -> str:
     """Search for instructions by name or description."""
+    if db:
+        try:
+            # Map common architecture names
+            arch_mapping = {
+                "x86_64": "x86",
+                "x86_32": "x86",
+                "AArch64": "aarch64"
+            }
+            
+            db_arch = arch_mapping.get(architecture, architecture) if architecture else None
+            instructions = db.search_instructions(query, db_arch)
+            
+            if instructions:
+                results = []
+                for instr in instructions:
+                    # Map back to user-friendly arch names
+                    user_arch = "x86_64" if instr.isa == "x86" else instr.isa
+                    results.append(f"{user_arch}: {instr.mnemonic} - {instr.description}")
+                return "\n".join(results)
+        except Exception as e:
+            logging.warning(f"Failed to search instructions in database: {e}")
+    
+    # Fallback to hardcoded data
     all_instructions = {
         "x86_64": {
             "MOV": "Move data between registers, memory, and immediate values",
