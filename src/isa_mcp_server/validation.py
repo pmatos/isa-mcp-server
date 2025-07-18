@@ -193,12 +193,14 @@ def _validate_database_integrity(db_path: Path) -> None:
 
             # Check for required tables
             cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='instructions'"
+                "SELECT name FROM sqlite_master WHERE type='table' AND "
+                "name='instructions'"
             )
             if not cursor.fetchone():
                 raise DatabaseIntegrityError(
-                    f"Database file '{db_path}' is missing required 'instructions' table. "
-                    "Please ensure this is a valid ISA database file."
+                    f"Database file '{db_path}' is missing required "
+                    "'instructions' table. Please ensure this is a valid ISA "
+                    "database file."
                 )
 
             # Check basic table structure
@@ -210,8 +212,9 @@ def _validate_database_integrity(db_path: Path) -> None:
 
             if missing_columns:
                 raise DatabaseIntegrityError(
-                    f"Database file '{db_path}' is missing required columns: {missing_columns}. "
-                    "Please ensure this is a valid ISA database file."
+                    f"Database file '{db_path}' is missing required columns: "
+                    f"{missing_columns}. Please ensure this is a valid ISA "
+                    "database file."
                 )
 
     except sqlite3.DatabaseError as e:
