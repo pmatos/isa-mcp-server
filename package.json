@@ -1,0 +1,25 @@
+{
+  "name": "isa-mcp-server",
+  "version": "1.0.0",
+  "description": "An MCP (Model Context Protocol) server providing documentation and information about Instruction Set Architectures (ISAs).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "inspector": "./run-inspector.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pmatos/isa-mcp-server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/pmatos/isa-mcp-server/issues"
+  },
+  "homepage": "https://github.com/pmatos/isa-mcp-server#readme",
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.16.1"
+  }
+}

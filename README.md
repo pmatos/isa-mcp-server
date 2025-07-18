@@ -73,6 +73,23 @@ uv run ruff format src/
 uv run python -c "from src.isa_mcp_server.server import mcp; print('Server imported successfully')"
 ```
 
+### Testing with MCP Inspector
+
+To test the MCP server interactively, you can use the MCP Inspector:
+
+```bash
+# Install dependencies (if not already done)
+npm install
+
+# Run the inspector
+./run-inspector.sh
+```
+
+This will open a web interface where you can:
+- Test resources like `isa://architectures` and `isa://instructions/x86_64`
+- Call tools like `search_instructions` and `compare_instructions`
+- See the server's responses in real-time
+
 ## License
 
 This project is licensed under the MIT License.
