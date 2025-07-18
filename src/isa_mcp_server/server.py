@@ -745,9 +745,6 @@ Examples:
             return f"Error searching instructions with pagination: {e}"
 
 
-# Default server instance for backward compatibility
-mcp = create_mcp_server()
-
-
 if __name__ == "__main__":
-    mcp.run()
+    server = create_mcp_server()
+    server.run()
