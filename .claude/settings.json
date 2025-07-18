@@ -6,7 +6,9 @@
       "Bash(mkdir:*)",
       "Bash(uv add:*)",
       "Bash(uv run ruff format:*)",
-      "Bash(uv run ruff:*)"
+      "Bash(uv run ruff:*)",
+      "Bash(find:*)",
+      "Bash(sqlite3:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
