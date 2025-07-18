@@ -46,128 +46,118 @@ def create_mcp_server(db_path: str = "isa_docs.db") -> FastMCP:
     # Store database reference for use in handlers
     mcp._db = db
 
-    return mcp
+    @mcp.resource("isa://architectures")
+    async def list_architectures() -> str:
+        """List all supported instruction set architectures."""
+        try:
+            architectures = mcp._db.get_supported_isas()
+            if architectures:
+                # Map database ISA names to user-friendly names
+                arch_mapping = {"x86": "x86_64"}
+                user_archs = [arch_mapping.get(arch, arch) for arch in architectures]
+                return "\n".join(f"- {arch}" for arch in user_archs)
+            else:
+                return "No architectures found in database"
+        except Exception as e:
+            logging.error(f"Failed to get architectures from database: {e}")
+            return f"Error accessing database: {e}"
 
+    @mcp.resource("isa://architecture/{name}")
+    async def get_architecture_info(name: str) -> str:
+        """Get detailed information about a specific architecture."""
+        try:
+            # Map user-friendly names to database ISA names
+            name_mapping = {"x86_64": "x86", "x86_32": "x86"}
+            db_arch = name_mapping.get(name, name)
 
-# Default server instance for backward compatibility
-mcp = create_mcp_server()
+            # Check if architecture exists in database
+            supported_isas = mcp._db.get_supported_isas()
+            if db_arch not in supported_isas:
+                return f"Architecture '{name}' not found in database"
 
+            # Get instruction count for this architecture
+            instruction_count = mcp._db.get_instruction_count(db_arch)
 
-@mcp.resource("isa://architectures")
-async def list_architectures() -> str:
-    """List all supported instruction set architectures."""
-    try:
-        architectures = mcp._db.get_supported_isas()
-        if architectures:
-            # Map database ISA names to user-friendly names
-            arch_mapping = {"x86": "x86_64"}
-            user_archs = [arch_mapping.get(arch, arch) for arch in architectures]
-            return "\n".join(f"- {arch}" for arch in user_archs)
-        else:
-            return "No architectures found in database"
-    except Exception as e:
-        logging.error(f"Failed to get architectures from database: {e}")
-        return f"Error accessing database: {e}"
-
-
-@mcp.resource("isa://architecture/{name}")
-async def get_architecture_info(name: str) -> str:
-    """Get detailed information about a specific architecture."""
-    try:
-        # Map user-friendly names to database ISA names
-        name_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = name_mapping.get(name, name)
-
-        # Check if architecture exists in database
-        supported_isas = mcp._db.get_supported_isas()
-        if db_arch not in supported_isas:
-            return f"Architecture '{name}' not found in database"
-
-        # Get instruction count for this architecture
-        instruction_count = mcp._db.get_instruction_count(db_arch)
-
-        # Generate basic architecture info from database
-        arch_info = {
-            "x86": {
-                "description": "x86 instruction set architecture (32-bit and 64-bit)",
-                "word_size": "32/64",
-                "endianness": "little",
-                "registers": "General purpose: EAX/RAX, EBX/RBX, ECX/RCX, EDX/RDX, "
-                "ESI/RSI, EDI/RDI, EBP/RBP, ESP/RSP",
-                "addressing_modes": "immediate, register, memory, indexed, "
-                "rip-relative",
+            # Generate basic architecture info from database
+            arch_info = {
+                "x86": {
+                    "description": "x86 instruction set architecture (32-bit and 64-bit)",
+                    "word_size": "32/64",
+                    "endianness": "little",
+                    "registers": "General purpose: EAX/RAX, EBX/RBX, ECX/RCX, EDX/RDX, "
+                    "ESI/RSI, EDI/RDI, EBP/RBP, ESP/RSP",
+                    "addressing_modes": "immediate, register, memory, indexed, "
+                    "rip-relative",
+                }
             }
-        }
 
-        info = arch_info.get(
-            db_arch,
-            {
-                "description": f"Architecture {name}",
-                "word_size": "Unknown",
-                "endianness": "Unknown",
-                "registers": "Unknown",
-                "addressing_modes": "Unknown",
-            },
-        )
+            info = arch_info.get(
+                db_arch,
+                {
+                    "description": f"Architecture {name}",
+                    "word_size": "Unknown",
+                    "endianness": "Unknown",
+                    "registers": "Unknown",
+                    "addressing_modes": "Unknown",
+                },
+            )
 
-        return f"""Architecture: {name}
+            return f"""Architecture: {name}
 Description: {info["description"]}
 Word Size: {info["word_size"]} bits
 Endianness: {info["endianness"]}
 Registers: {info["registers"]}
 Addressing Modes: {info["addressing_modes"]}
 Instructions Available: {instruction_count}"""
-    except Exception as e:
-        logging.error(f"Failed to get architecture info: {e}")
-        return f"Error accessing architecture information: {e}"
+        except Exception as e:
+            logging.error(f"Failed to get architecture info: {e}")
+            return f"Error accessing architecture information: {e}"
 
+    @mcp.resource("isa://instructions/{arch}")
+    async def list_instructions(arch: str) -> str:
+        """List instructions for a specific architecture."""
+        try:
+            # Map common architecture names
+            arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
+            db_arch = arch_mapping.get(arch, arch)
 
-@mcp.resource("isa://instructions/{arch}")
-async def list_instructions(arch: str) -> str:
-    """List instructions for a specific architecture."""
-    try:
-        # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(arch, arch)
+            instructions = mcp._db.list_instructions(db_arch, limit=100)
 
-        instructions = mcp._db.list_instructions(db_arch, limit=100)
+            if instructions:
+                # Get unique mnemonics
+                mnemonics = list(set(instr.mnemonic for instr in instructions))
+                mnemonics.sort()
+                return "\n".join(f"- {instr}" for instr in mnemonics)
+            else:
+                return f"No instructions found for architecture '{arch}'"
+        except Exception as e:
+            logging.error(f"Failed to get instructions from database: {e}")
+            return f"Error accessing instructions for '{arch}': {e}"
 
-        if instructions:
-            # Get unique mnemonics
-            mnemonics = list(set(instr.mnemonic for instr in instructions))
-            mnemonics.sort()
-            return "\n".join(f"- {instr}" for instr in mnemonics)
-        else:
-            return f"No instructions found for architecture '{arch}'"
-    except Exception as e:
-        logging.error(f"Failed to get instructions from database: {e}")
-        return f"Error accessing instructions for '{arch}': {e}"
+    @mcp.resource("isa://instruction/{arch}/{name}")
+    async def get_instruction_info(arch: str, name: str) -> str:
+        """Get detailed information about a specific instruction."""
+        try:
+            # Map common architecture names
+            arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
+            db_arch = arch_mapping.get(arch, arch)
 
+            instruction = mcp._db.get_instruction(db_arch, name.upper())
 
-@mcp.resource("isa://instruction/{arch}/{name}")
-async def get_instruction_info(arch: str, name: str) -> str:
-    """Get detailed information about a specific instruction."""
-    try:
-        # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(arch, arch)
+            if instruction:
+                # Convert operands to string list
+                operand_types = [op.type for op in instruction.operands]
 
-        instruction = mcp._db.get_instruction(db_arch, name.upper())
+                # Generate basic examples from syntax
+                examples = [f"{instruction.syntax}"]
 
-        if instruction:
-            # Convert operands to string list
-            operand_types = [op.type for op in instruction.operands]
+                flags_affected = (
+                    ", ".join(instruction.flags_affected)
+                    if instruction.flags_affected
+                    else "None"
+                )
 
-            # Generate basic examples from syntax
-            examples = [f"{instruction.syntax}"]
-
-            flags_affected = (
-                ", ".join(instruction.flags_affected)
-                if instruction.flags_affected
-                else "None"
-            )
-
-            return f"""Instruction: {instruction.mnemonic}
+                return f"""Instruction: {instruction.mnemonic}
 Description: {instruction.description}
 Syntax: {instruction.syntax}
 Operands: {", ".join(operand_types)}
@@ -176,52 +166,53 @@ Category: {instruction.category}
 Extension: {instruction.extension}
 Examples:
 {chr(10).join(f"  {ex}" for ex in examples)}"""
-        else:
-            return f"Instruction '{name}' not found for architecture '{arch}'"
-    except Exception as e:
-        logging.error(f"Failed to get instruction from database: {e}")
-        return f"Error accessing instruction '{name}' for '{arch}': {e}"
+            else:
+                return f"Instruction '{name}' not found for architecture '{arch}'"
+        except Exception as e:
+            logging.error(f"Failed to get instruction from database: {e}")
+            return f"Error accessing instruction '{name}' for '{arch}': {e}"
 
+    @mcp.tool("search_instructions")
+    async def search_instructions(query: str, architecture: Optional[str] = None) -> str:
+        """Search for instructions by name or description."""
+        try:
+            # Map common architecture names
+            arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
+            db_arch = arch_mapping.get(architecture, architecture) if architecture else None
 
-@mcp.tool("search_instructions")
-async def search_instructions(query: str, architecture: Optional[str] = None) -> str:
-    """Search for instructions by name or description."""
-    try:
-        # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(architecture, architecture) if architecture else None
+            instructions = mcp._db.search_instructions(query, db_arch)
 
-        instructions = mcp._db.search_instructions(query, db_arch)
+            if instructions:
+                results = []
+                for instr in instructions:
+                    # Map back to user-friendly arch names
+                    user_arch = "x86_64" if instr.isa == "x86" else instr.isa
+                    results.append(f"{user_arch}: {instr.mnemonic} - {instr.description}")
+                return "\n".join(results)
+            else:
+                return f"No instructions found matching '{query}'"
+        except Exception as e:
+            logging.error(f"Failed to search instructions in database: {e}")
+            return f"Error searching instructions: {e}"
 
-        if instructions:
-            results = []
-            for instr in instructions:
-                # Map back to user-friendly arch names
-                user_arch = "x86_64" if instr.isa == "x86" else instr.isa
-                results.append(f"{user_arch}: {instr.mnemonic} - {instr.description}")
-            return "\n".join(results)
-        else:
-            return f"No instructions found matching '{query}'"
-    except Exception as e:
-        logging.error(f"Failed to search instructions in database: {e}")
-        return f"Error searching instructions: {e}"
+    @mcp.tool("compare_instructions")
+    async def compare_instructions(instruction: str, arch1: str, arch2: str) -> str:
+        """Compare how an instruction is implemented across different architectures."""
+        try:
+            info1 = await get_instruction_info(arch1, instruction)
+            info2 = await get_instruction_info(arch2, instruction)
 
+            return (
+                f"Comparison of '{instruction}' instruction:\n\n"
+                f"{arch1}:\n{info1}\n\n{arch2}:\n{info2}"
+            )
+        except Exception as e:
+            logging.error(f"Error comparing instructions: {e}")
+            return f"Error comparing instructions: {str(e)}"
 
-@mcp.tool("compare_instructions")
-async def compare_instructions(instruction: str, arch1: str, arch2: str) -> str:
-    """Compare how an instruction is implemented across different architectures."""
-    try:
-        info1 = await get_instruction_info(arch1, instruction)
-        info2 = await get_instruction_info(arch2, instruction)
-
-        return (
-            f"Comparison of '{instruction}' instruction:\n\n"
-            f"{arch1}:\n{info1}\n\n{arch2}:\n{info2}"
-        )
-    except Exception as e:
-        logging.error(f"Error comparing instructions: {e}")
-        return f"Error comparing instructions: {str(e)}"
+    return mcp
 
 
 if __name__ == "__main__":
-    mcp.run()
+    server = create_mcp_server()
+    server.run()
