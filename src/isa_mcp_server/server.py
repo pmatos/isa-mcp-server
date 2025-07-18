@@ -8,6 +8,28 @@ from pydantic import BaseModel
 
 from .isa_database import ISADatabase
 
+# Centralized architecture name mappings
+ARCHITECTURE_MAPPINGS = {
+    "x86_64": "x86",
+    "x86_32": "x86",
+    "AArch64": "aarch64",
+}
+
+
+def map_architecture_name(user_arch: str) -> str:
+    """Map user-friendly architecture names to database names."""
+    return ARCHITECTURE_MAPPINGS.get(user_arch, user_arch)
+
+
+def map_to_user_architecture_name(db_arch: str) -> str:
+    """Map database architecture names to user-friendly names."""
+    # Create reverse mapping
+    reverse_mapping = {v: k for k, v in ARCHITECTURE_MAPPINGS.items()}
+    # For x86, prefer x86_64 as the user-friendly name
+    if db_arch == "x86":
+        return "x86_64"
+    return reverse_mapping.get(db_arch, db_arch)
+
 
 class InstructionInfo(BaseModel):
     """Information about a specific instruction."""
@@ -60,8 +82,7 @@ async def list_architectures() -> str:
         architectures = mcp._db.get_supported_isas()
         if architectures:
             # Map database ISA names to user-friendly names
-            arch_mapping = {"x86": "x86_64"}
-            user_archs = [arch_mapping.get(arch, arch) for arch in architectures]
+            user_archs = [map_to_user_architecture_name(arch) for arch in architectures]
             return "\n".join(f"- {arch}" for arch in user_archs)
         else:
             return "No architectures found in database"
@@ -75,8 +96,7 @@ async def get_architecture_info(name: str) -> str:
     """Get detailed information about a specific architecture."""
     try:
         # Map user-friendly names to database ISA names
-        name_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = name_mapping.get(name, name)
+        db_arch = map_architecture_name(name)
 
         # Check if architecture exists in database
         supported_isas = mcp._db.get_supported_isas()
@@ -127,8 +147,7 @@ async def list_instructions(arch: str) -> str:
     """List instructions for a specific architecture."""
     try:
         # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(arch, arch)
+        db_arch = map_architecture_name(arch)
 
         instructions = mcp._db.list_instructions(db_arch, limit=100)
 
@@ -149,8 +168,7 @@ async def get_instruction_info(arch: str, name: str) -> str:
     """Get detailed information about a specific instruction."""
     try:
         # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(arch, arch)
+        db_arch = map_architecture_name(arch)
 
         instruction = mcp._db.get_instruction(db_arch, name.upper())
 
@@ -188,8 +206,7 @@ async def search_instructions(query: str, architecture: Optional[str] = None) ->
     """Search for instructions by name or description."""
     try:
         # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(architecture, architecture) if architecture else None
+        db_arch = map_architecture_name(architecture) if architecture else None
 
         instructions = mcp._db.search_instructions(query, db_arch)
 
@@ -197,7 +214,7 @@ async def search_instructions(query: str, architecture: Optional[str] = None) ->
             results = []
             for instr in instructions:
                 # Map back to user-friendly arch names
-                user_arch = "x86_64" if instr.isa == "x86" else instr.isa
+                user_arch = map_to_user_architecture_name(instr.isa)
                 results.append(f"{user_arch}: {instr.mnemonic} - {instr.description}")
             return "\n".join(results)
         else:
