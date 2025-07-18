@@ -122,3 +122,7 @@ Currently minimal testing - only import validation. The server relies on:
 GitHub Actions workflow runs on push to main/develop and PRs to main:
 - **Test job**: Python 3.13, dependency installation, linting, format checking, type checking, import testing
 - **Build job**: Package building and artifact upload
+
+# ISA information
+
+* The submodule `External/xed` contains information about the Intel x86_32/x86_64 ISA.
