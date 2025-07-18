@@ -41,8 +41,8 @@ def setup_logging(verbose: bool = False):
 
 
 async def import_intel_data(db: ISADatabase, source_dir: Path) -> Dict:
-    """Import Intel x86 data from XED."""
-    logging.info(f"Importing Intel x86 data from {source_dir}")
+    """Import Intel x86_32 and x86_64 data from XED."""
+    logging.info(f"Importing Intel x86_32 and x86_64 data from {source_dir}")
     
     importer = XEDImporter(db)
     result = await importer.import_from_source(source_dir)
@@ -75,7 +75,7 @@ async def main():
         epilog="""
 Examples:
   %(prog)s --all                                    # Import all available ISAs
-  %(prog)s --intel --source-dir External/xed       # Import Intel x86 from XED
+  %(prog)s --intel --source-dir External/xed       # Import Intel x86_32/x86_64 from XED
   %(prog)s --arm --source-dir /path/to/arm         # Import ARM (future)
   %(prog)s --riscv --source-dir /path/to/riscv     # Import RISC-V (future)
   %(prog)s --intel --db-path custom.db             # Use custom database path
@@ -105,7 +105,7 @@ Examples:
     parser.add_argument(
         '--intel',
         action='store_true',
-        help='Import Intel x86 instructions'
+        help='Import Intel x86_32 and x86_64 instructions'
     )
     
     parser.add_argument(
