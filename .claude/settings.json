@@ -9,7 +9,8 @@
       "Bash(uv run ruff:*)",
       "Bash(find:*)",
       "Bash(sqlite3:*)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(gh issue:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
