@@ -250,6 +250,24 @@ CALLING_CONVENTIONS: Dict[str, Dict[str, Set[str]]] = {
 }
 
 
+class PaginationMetadata(BaseModel):
+    """Pagination metadata for paginated responses."""
+
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+class PaginatedResult(BaseModel):
+    """Generic paginated result with metadata."""
+
+    data: List[str]
+    pagination: PaginationMetadata
+
+
 def create_mcp_server(db_path: str = "isa_docs.db") -> FastMCP:
     """Create and configure MCP server with database."""
     server = FastMCP("ISA MCP Server")
@@ -591,6 +609,140 @@ Examples:
         except Exception as e:
             logging.error(f"Failed to search instructions in database: {e}")
             return f"Error searching instructions: {e}"
+
+    @server.tool("list_instructions_paginated")
+    async def list_instructions_paginated(
+        arch: str,
+        page: int = 1,
+        page_size: int = 50,
+        sort_by: str = "mnemonic",
+        sort_direction: str = "asc",
+    ) -> str:
+        """List instructions with pagination support."""
+        try:
+            # Validate inputs
+            if page < 1:
+                page = 1
+            if page_size < 1 or page_size > 500:
+                page_size = min(max(page_size, 1), 500)
+
+            # Map common architecture names
+            arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
+            db_arch = arch_mapping.get(arch, arch)
+
+            # Calculate offset
+            offset = (page - 1) * page_size
+
+            # Get total count
+            total_items = server._db.get_instruction_count(db_arch)  # type: ignore[attr-defined]
+
+            # Get page of results
+            instructions = server._db.list_instructions(  # type: ignore[attr-defined]
+                db_arch,
+                limit=page_size,
+                offset=offset,
+                order_by=sort_by,
+                order_direction=sort_direction.upper(),
+            )
+
+            # Calculate pagination metadata
+            total_pages = (total_items + page_size - 1) // page_size
+            has_next = page * page_size < total_items
+            has_prev = page > 1
+
+            # Format instruction data
+            if instructions:
+                mnemonics = list(set(instr.mnemonic for instr in instructions))
+                mnemonics.sort()
+                data = [f"{instr}" for instr in mnemonics]
+            else:
+                data = []
+
+            # Create paginated result
+            result = PaginatedResult(
+                data=data,
+                pagination=PaginationMetadata(
+                    page=page,
+                    page_size=page_size,
+                    total_items=total_items,
+                    total_pages=total_pages,
+                    has_next=has_next,
+                    has_prev=has_prev,
+                ),
+            )
+
+            return json.dumps(result.model_dump(), indent=2)
+        except Exception as e:
+            logging.error(f"Failed to get paginated instructions: {e}")
+            return f"Error getting paginated instructions for '{arch}': {e}"
+
+    @server.tool("search_instructions_paginated")
+    async def search_instructions_paginated(
+        query: str,
+        architecture: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> str:
+        """Search for instructions with pagination support."""
+        try:
+            # Validate inputs
+            if page < 1:
+                page = 1
+            if page_size < 1 or page_size > 500:
+                page_size = min(max(page_size, 1), 500)
+
+            # Map common architecture names
+            arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
+            db_arch = (
+                arch_mapping.get(architecture, architecture) if architecture else None
+            )
+
+            # Calculate offset
+            offset = (page - 1) * page_size
+
+            # Get total count
+            total_items = server._db.get_search_count(query, db_arch)  # type: ignore[attr-defined]
+
+            # Get page of results
+            instructions = server._db.search_instructions(  # type: ignore[attr-defined]
+                query, db_arch, limit=page_size, offset=offset
+            )
+
+            # Calculate pagination metadata
+            total_pages = (total_items + page_size - 1) // page_size
+            has_next = page * page_size < total_items
+            has_prev = page > 1
+
+            # Format instruction data
+            if instructions:
+                results = []
+                for instr in instructions:
+                    # Map back to user-friendly arch names
+                    user_arch = "x86_64" if instr.isa == "x86" else instr.isa
+                    results.append(
+                        f"{user_arch}: {instr.mnemonic} - {instr.description}"
+                    )
+                data = results
+            else:
+                data = []
+
+            # Create paginated result
+            result = PaginatedResult(
+                data=data,
+                pagination=PaginationMetadata(
+                    page=page,
+                    page_size=page_size,
+                    total_items=total_items,
+                    total_pages=total_pages,
+                    has_next=has_next,
+                    has_prev=has_prev,
+                ),
+            )
+
+            return json.dumps(result.model_dump(), indent=2)
+        except Exception as e:
+            logging.error(f"Failed to search instructions with pagination: {e}")
+            return f"Error searching instructions with pagination: {e}"
 
 
 # Default server instance for backward compatibility
