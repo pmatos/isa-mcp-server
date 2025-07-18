@@ -19,7 +19,7 @@ class XEDImporter(ISAImporter):
 
     @property
     def isa_name(self) -> str:
-        return "x86"
+        return "x86_32,x86_64"  # This importer handles both architectures
 
     @property
     def importer_version(self) -> str:
@@ -99,11 +99,11 @@ class XEDImporter(ISAImporter):
         try:
             for xed_instruction in self.parser.parse_file(file_path):
                 try:
-                    instruction_record = self._convert_to_instruction_record(
+                    instruction_records = self._convert_to_instruction_record(
                         xed_instruction
                     )
-                    if instruction_record:
-                        yield instruction_record
+                    for record in instruction_records:
+                        yield record
                 except Exception as e:
                     self.log_error(
                         f"Error converting instruction {xed_instruction.iclass}: {e}"
@@ -113,10 +113,16 @@ class XEDImporter(ISAImporter):
 
     def _convert_to_instruction_record(
         self, xed_instr: XEDInstruction
-    ) -> Optional[InstructionRecord]:
-        """Convert XED instruction to InstructionRecord."""
+    ) -> List[InstructionRecord]:
+        """Convert XED instruction to InstructionRecord(s) for appropriate archs."""
         if not xed_instr.iclass:
-            return None
+            return []
+
+        # Determine which architectures this instruction belongs to
+        target_isas = self._determine_target_architectures(xed_instr)
+
+        if not target_isas:
+            return []
 
         # Parse operands
         operands = self._parse_operands(xed_instr.operands)
@@ -136,24 +142,87 @@ class XEDImporter(ISAImporter):
         # Determine variant (for instructions with multiple forms)
         variant = self._determine_variant(xed_instr)
 
-        return InstructionRecord(
-            isa="x86",
-            mnemonic=xed_instr.iclass,
-            variant=variant,
-            category=xed_instr.category,
-            extension=xed_instr.extension,
-            isa_set=xed_instr.isa_set,
-            description=description,
-            syntax=syntax,
-            operands=operands,
-            encoding=encoding,
-            flags_affected=flags_affected,
-            cpuid_features=self._get_cpuid_features(xed_instr),
-            cpl=xed_instr.cpl,
-            attributes=xed_instr.attributes,
-            added_version=None,
-            deprecated=False,
-        )
+        # Create instruction record for each target architecture
+        records = []
+        for isa in target_isas:
+            record = InstructionRecord(
+                isa=isa,
+                mnemonic=xed_instr.iclass,
+                variant=variant,
+                category=xed_instr.category,
+                extension=xed_instr.extension,
+                isa_set=xed_instr.isa_set,
+                description=description,
+                syntax=syntax,
+                operands=operands,
+                encoding=encoding,
+                flags_affected=flags_affected,
+                cpuid_features=self._get_cpuid_features(xed_instr),
+                cpl=xed_instr.cpl,
+                attributes=xed_instr.attributes,
+                added_version=None,
+                deprecated=False,
+            )
+            records.append(record)
+
+        return records
+
+    def _determine_target_architectures(self, xed_instr: XEDInstruction) -> List[str]:
+        """Determine which architectures this instruction belongs to based on XED."""
+        isas = []
+
+        # Check pattern for mode indicators
+        pattern = xed_instr.pattern.lower() if xed_instr.pattern else ""
+
+        # Check for explicit mode restrictions
+        if "mode64" in pattern:
+            isas.append("x86_64")
+        if "mode32" in pattern:
+            isas.append("x86_32")
+        if "not64" in pattern:
+            # Instruction not available in 64-bit mode, only 32-bit
+            return ["x86_32"]
+
+        # Check attributes for mode restrictions
+        attributes = []
+        if xed_instr.attributes:
+            attributes = [attr.upper() for attr in xed_instr.attributes]
+
+        # LONGMODE extension indicates 64-bit specific instruction
+        if xed_instr.extension == "LONGMODE" or "LONGMODE" in attributes:
+            isas.append("x86_64")
+
+        # Check for 64-bit specific ISA sets
+        if xed_instr.isa_set in ["LONGMODE"]:
+            isas.append("x86_64")
+
+        # Check for REX prefix requirements (64-bit specific)
+        if "rexw_prefix" in pattern or "rex_prefix" in pattern:
+            if "x86_64" not in isas:
+                isas.append("x86_64")
+
+        # Check for 32-bit specific attributes
+        if any(attr in attributes for attr in ["PROTECTED_MODE"]) and not isas:
+            # Instructions that require protected mode but don't specify 64-bit
+            # are typically available in both modes
+            isas.extend(["x86_32", "x86_64"])
+
+        # Handle special cases for specific instructions
+        iclass = xed_instr.iclass.upper()
+        if iclass in ["SYSCALL", "SYSRET"]:
+            # These are primarily 64-bit instructions
+            isas.append("x86_64")
+        elif iclass in ["SYSENTER", "SYSEXIT"]:
+            # These work in both modes but are more commonly used in 32-bit
+            if not isas:
+                isas.extend(["x86_32", "x86_64"])
+
+        # Default: if no specific mode restrictions found, available in both
+        if not isas:
+            isas = ["x86_32", "x86_64"]
+
+        # Remove duplicates and sort
+        return sorted(list(set(isas)))
 
     def _parse_operands(self, operands_str: str) -> List[OperandRecord]:
         """Parse XED operands string into OperandRecord list."""
