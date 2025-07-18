@@ -395,24 +395,55 @@ class ISADatabase:
             return self._row_to_instruction(row)
 
     def list_instructions(
-        self, isa: str, limit: Optional[int] = None
+        self,
+        isa: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: str = "mnemonic",
+        order_direction: str = "ASC",
     ) -> List[InstructionRecord]:
-        """List all instructions for an ISA."""
+        """List all instructions for an ISA with pagination support."""
         with self.get_connection() as conn:
-            query = "SELECT * FROM instructions WHERE isa = ? ORDER BY mnemonic"
+            # Validate order_by to prevent SQL injection
+            valid_columns = [
+                "mnemonic",
+                "category",
+                "extension",
+                "isa_set",
+                "description",
+            ]
+            if order_by not in valid_columns:
+                order_by = "mnemonic"
+
+            # Validate order_direction
+            if order_direction.upper() not in ["ASC", "DESC"]:
+                order_direction = "ASC"
+
+            query = (
+                f"SELECT * FROM instructions WHERE isa = ? "
+                f"ORDER BY {order_by} {order_direction}"
+            )
             params: List[Any] = [isa]
 
             if limit:
                 query += " LIMIT ?"
                 params.append(limit)
 
+            if offset:
+                query += " OFFSET ?"
+                params.append(offset)
+
             cursor = conn.execute(query, params)
             return [self._row_to_instruction(row) for row in cursor.fetchall()]
 
     def search_instructions(
-        self, query: str, isa: Optional[str] = None, limit: int = 50
+        self,
+        query: str,
+        isa: Optional[str] = None,
+        limit: int = 50,
+        offset: Optional[int] = None,
     ) -> List[InstructionRecord]:
-        """Search instructions using full-text search."""
+        """Search instructions using full-text search with pagination support."""
         with self.get_connection() as conn:
             # Handle empty query by listing all instructions for the ISA
             if not query or query.strip() == "":
@@ -429,27 +460,35 @@ class ISADatabase:
                     return []
 
             if isa:
-                cursor = conn.execute(
-                    """
+                base_query = """
                     SELECT instructions.* FROM instruction_search
                     JOIN instructions ON instruction_search.rowid = instructions.id
                     WHERE instruction_search MATCH ? AND instructions.isa = ?
                     ORDER BY rank
                     LIMIT ?
-                """,
-                    (query, isa, limit),
-                )
+                """
+                params = [query, isa, limit]
+
+                if offset:
+                    base_query += " OFFSET ?"
+                    params.append(offset)
+
+                cursor = conn.execute(base_query, params)
             else:
-                cursor = conn.execute(
-                    """
+                base_query = """
                     SELECT instructions.* FROM instruction_search
                     JOIN instructions ON instruction_search.rowid = instructions.id
                     WHERE instruction_search MATCH ?
                     ORDER BY rank
                     LIMIT ?
-                """,
-                    (query, limit),
-                )
+                """
+                params = [query, limit]
+
+                if offset:
+                    base_query += " OFFSET ?"
+                    params.append(offset)
+
+                cursor = conn.execute(base_query, params)
 
             return [self._row_to_instruction(row) for row in cursor.fetchall()]
 
@@ -468,6 +507,30 @@ class ISADatabase:
                 )
             else:
                 cursor = conn.execute("SELECT COUNT(*) FROM instructions")
+
+            return cursor.fetchone()[0]
+
+    def get_search_count(self, query: str, isa: Optional[str] = None) -> int:
+        """Get total count of search results."""
+        with self.get_connection() as conn:
+            if isa:
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM instruction_search
+                    JOIN instructions ON instruction_search.rowid = instructions.id
+                    WHERE instruction_search MATCH ? AND isa = ?
+                    """,
+                    (query, isa),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM instruction_search
+                    JOIN instructions ON instruction_search.rowid = instructions.id
+                    WHERE instruction_search MATCH ?
+                    """,
+                    (query,),
+                )
 
             return cursor.fetchone()[0]
 
