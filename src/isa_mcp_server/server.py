@@ -59,10 +59,7 @@ async def list_architectures() -> str:
     try:
         architectures = mcp._db.get_supported_isas()
         if architectures:
-            # Map database ISA names to user-friendly names
-            arch_mapping = {"x86": "x86_64"}
-            user_archs = [arch_mapping.get(arch, arch) for arch in architectures]
-            return "\n".join(f"- {arch}" for arch in user_archs)
+            return "\n".join(f"- {arch}" for arch in sorted(architectures))
         else:
             return "No architectures found in database"
     except Exception as e:
@@ -74,33 +71,34 @@ async def list_architectures() -> str:
 async def get_architecture_info(name: str) -> str:
     """Get detailed information about a specific architecture."""
     try:
-        # Map user-friendly names to database ISA names
-        name_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = name_mapping.get(name, name)
-
         # Check if architecture exists in database
         supported_isas = mcp._db.get_supported_isas()
-        if db_arch not in supported_isas:
+        if name not in supported_isas:
             return f"Architecture '{name}' not found in database"
 
         # Get instruction count for this architecture
-        instruction_count = mcp._db.get_instruction_count(db_arch)
+        instruction_count = mcp._db.get_instruction_count(name)
 
         # Generate basic architecture info from database
         arch_info = {
-            "x86": {
-                "description": "x86 instruction set architecture (32-bit and 64-bit)",
-                "word_size": "32/64",
+            "x86_32": {
+                "description": "x86 32-bit instruction set architecture",
+                "word_size": "32",
                 "endianness": "little",
-                "registers": "General purpose: EAX/RAX, EBX/RBX, ECX/RCX, EDX/RDX, "
-                "ESI/RSI, EDI/RDI, EBP/RBP, ESP/RSP",
-                "addressing_modes": "immediate, register, memory, indexed, "
-                "rip-relative",
-            }
+                "registers": "General purpose: EAX, EBX, ECX, EDX, ESI, EDI, EBP, ESP",
+                "addressing_modes": "immediate, register, memory, indexed",
+            },
+            "x86_64": {
+                "description": "x86 64-bit instruction set architecture",
+                "word_size": "64",
+                "endianness": "little",
+                "registers": "General: RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP, R8-R15",
+                "addressing_modes": "immediate, register, memory, indexed, rip-rel",
+            },
         }
 
         info = arch_info.get(
-            db_arch,
+            name,
             {
                 "description": f"Architecture {name}",
                 "word_size": "Unknown",
@@ -126,11 +124,7 @@ Instructions Available: {instruction_count}"""
 async def list_instructions(arch: str) -> str:
     """List instructions for a specific architecture."""
     try:
-        # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(arch, arch)
-
-        instructions = mcp._db.list_instructions(db_arch, limit=100)
+        instructions = mcp._db.list_instructions(arch, limit=100)
 
         if instructions:
             # Get unique mnemonics
@@ -148,11 +142,7 @@ async def list_instructions(arch: str) -> str:
 async def get_instruction_info(arch: str, name: str) -> str:
     """Get detailed information about a specific instruction."""
     try:
-        # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(arch, arch)
-
-        instruction = mcp._db.get_instruction(db_arch, name.upper())
+        instruction = mcp._db.get_instruction(arch, name.upper())
 
         if instruction:
             # Convert operands to string list
@@ -187,18 +177,12 @@ Examples:
 async def search_instructions(query: str, architecture: Optional[str] = None) -> str:
     """Search for instructions by name or description."""
     try:
-        # Map common architecture names
-        arch_mapping = {"x86_64": "x86", "x86_32": "x86"}
-        db_arch = arch_mapping.get(architecture, architecture) if architecture else None
-
-        instructions = mcp._db.search_instructions(query, db_arch)
+        instructions = mcp._db.search_instructions(query, architecture)
 
         if instructions:
             results = []
             for instr in instructions:
-                # Map back to user-friendly arch names
-                user_arch = "x86_64" if instr.isa == "x86" else instr.isa
-                results.append(f"{user_arch}: {instr.mnemonic} - {instr.description}")
+                results.append(f"{instr.isa}: {instr.mnemonic} - {instr.description}")
             return "\n".join(results)
         else:
             return f"No instructions found matching '{query}'"
