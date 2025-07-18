@@ -8,6 +8,12 @@ from fastmcp import FastMCP
 from pydantic import BaseModel
 
 from .isa_database import ISADatabase
+from .validation import (
+    DatabaseIntegrityError,
+    DatabasePathError,
+    DatabasePermissionError,
+    validate_db_path,
+)
 
 
 class InstructionInfo(BaseModel):
@@ -248,13 +254,29 @@ def create_mcp_server(db_path: str = "isa_docs.db") -> FastMCP:
     """Create and configure MCP server with database."""
     server = FastMCP("ISA MCP Server")
 
-    # Initialize database
-    db = ISADatabase(db_path)
+    # Validate database path for security and accessibility
+    try:
+        validated_path = validate_db_path(db_path)
+    except DatabasePathError as e:
+        logging.error(f"Invalid database path: {e}")
+        raise RuntimeError(f"Database path validation failed: {e}") from e
+    except DatabasePermissionError as e:
+        logging.error(f"Database permission error: {e}")
+        raise RuntimeError(f"Database permission error: {e}") from e
+    except DatabaseIntegrityError as e:
+        logging.error(f"Database integrity error: {e}")
+        raise RuntimeError(f"Database integrity error: {e}") from e
+
+    # Initialize database with validated path
+    db = ISADatabase(str(validated_path))
     try:
         db.initialize_database()
     except Exception as e:
-        logging.error(f"Failed to initialize database at {db_path}: {e}")
-        raise RuntimeError(f"Cannot start server without database at {db_path}")
+        logging.error(f"Failed to initialize database at {validated_path}: {e}")
+        raise RuntimeError(
+            f"Cannot start server: Database initialization failed at {validated_path}. "
+            f"Error: {e}"
+        ) from e
 
     # Store database reference for use in handlers
     server._db = db  # type: ignore[attr-defined]
