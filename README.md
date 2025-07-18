@@ -7,7 +7,6 @@ An MCP (Model Context Protocol) server providing documentation and information a
 - **Architecture Information**: Get detailed information about different ISAs including x86-64, ARM64, and RISC-V
 - **Instruction Documentation**: Look up specific instructions with syntax, operands, and examples
 - **Instruction Search**: Search for instructions by name or description
-- **Cross-Architecture Comparison**: Compare how instructions are implemented across different architectures
 
 ## Supported Architectures
 
