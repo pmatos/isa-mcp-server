@@ -15,6 +15,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     
     - name: Install uv
       uses: astral-sh/setup-uv@v4
@@ -36,8 +38,20 @@ jobs:
     - name: Run type checking
       run: uv run python -m py_compile src/isa_mcp_server/*.py
     
+    - name: Run unit tests
+      run: uv run python -m pytest tests/unit/ -v
+    
+    - name: Run integration tests
+      run: uv run python -m pytest tests/integration/ -v
+    
     - name: Test server import
       run: uv run python -c "from src.isa_mcp_server.server import mcp; print('Server imported successfully')"
+    
+    - name: Test ARM importer import
+      run: uv run python -c "from src.isa_mcp_server.importers.arm_importer import ARMImporter; print('ARM importer imported successfully')"
+    
+    - name: Test ARM metadata parser import
+      run: uv run python -c "from src.isa_mcp_server.arm_metadata_parser import ARMMetadataParser; print('ARM metadata parser imported successfully')"
 
   build:
     runs-on: ubuntu-latest

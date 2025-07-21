@@ -543,6 +543,24 @@ class ISADatabase:
                 )
             return None
 
+    def get_all_architectures(self) -> List[ArchitectureRecord]:
+        """Get all architectures from the database."""
+        with self.get_connection() as conn:
+            cursor = conn.execute("SELECT * FROM architectures ORDER BY isa_name")
+            architectures = []
+            for row in cursor.fetchall():
+                architectures.append(
+                    ArchitectureRecord(
+                        id=row["id"],
+                        isa_name=row["isa_name"],
+                        word_size=row["word_size"],
+                        endianness=row["endianness"],
+                        description=row["description"],
+                        machine_mode=row["machine_mode"],
+                    )
+                )
+            return architectures
+
     def get_architecture_registers(self, isa_name: str) -> List[RegisterRecord]:
         """Get all registers for an architecture."""
         with self.get_connection() as conn:
@@ -598,6 +616,17 @@ class ISADatabase:
                     )
                 )
             return modes
+
+    # Alias methods for backward compatibility with tests
+    def get_registers_for_architecture(self, isa_name: str) -> List[RegisterRecord]:
+        """Alias for get_architecture_registers for backward compatibility."""
+        return self.get_architecture_registers(isa_name)
+
+    def get_addressing_modes_for_architecture(
+        self, isa_name: str
+    ) -> List[AddressingModeRecord]:
+        """Alias for get_architecture_addressing_modes for backward compatibility."""
+        return self.get_architecture_addressing_modes(isa_name)
 
     def _row_to_instruction(self, row: sqlite3.Row) -> InstructionRecord:
         """Convert database row to InstructionRecord."""
