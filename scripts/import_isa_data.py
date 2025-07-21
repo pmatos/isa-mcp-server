@@ -40,15 +40,25 @@ def setup_logging(verbose: bool = False):
     )
 
 
-async def import_intel_data(db: ISADatabase, source_dir: Path) -> Dict:
+async def import_intel_data(
+    db: ISADatabase, source_dir: Path, skip_metadata: bool = False
+) -> Dict:
     """Import Intel x86_32 and x86_64 data from XED."""
     logging.info(f"Importing Intel x86_32 and x86_64 data from {source_dir}")
     
     importer = XEDImporter(db)
-    result = await importer.import_from_source(source_dir)
+    result = await importer.import_from_source(source_dir, skip_metadata=skip_metadata)
     
     if result['success']:
-        logging.info(f"Intel import successful: {result['stats']['instructions_inserted']} instructions imported")
+        instr_count = result['stats']['instructions_inserted']
+        metadata_msg = ""
+        if 'metadata_imported' in result and result['metadata_imported']:
+            metadata_msg = " (including architecture metadata)"
+        elif skip_metadata:
+            metadata_msg = " (metadata skipped)"
+        logging.info(
+            f"Intel import successful: {instr_count} instructions imported{metadata_msg}"
+        )
     else:
         logging.error(f"Intel import failed: {result['error']}")
     
@@ -74,8 +84,9 @@ async def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --all                                    # Import all available ISAs
+  %(prog)s --all                                    # Import all available ISAs with metadata
   %(prog)s --intel --source-dir External/xed       # Import Intel x86_32/x86_64 from XED
+  %(prog)s --intel --skip-metadata                 # Import Intel instructions only
   %(prog)s --arm --source-dir /path/to/arm         # Import ARM (future)
   %(prog)s --riscv --source-dir /path/to/riscv     # Import RISC-V (future)
   %(prog)s --intel --db-path custom.db             # Use custom database path
@@ -159,6 +170,12 @@ Examples:
         help='Suppress all output except errors'
     )
     
+    parser.add_argument(
+        '--skip-metadata',
+        action='store_true',
+        help='Skip architecture metadata import (instructions only)'
+    )
+    
     args = parser.parse_args()
     
     # Set up logging
@@ -193,7 +210,9 @@ Examples:
             logging.error(f"Intel source directory not found: {source_dir}")
             overall_success = False
         else:
-            results['intel'] = await import_intel_data(db, source_dir)
+            results['intel'] = await import_intel_data(
+                db, source_dir, skip_metadata=args.skip_metadata
+            )
             if not results['intel']['success']:
                 overall_success = False
     

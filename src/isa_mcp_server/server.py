@@ -79,42 +79,67 @@ async def get_architecture_info(name: str) -> str:
         # Get instruction count for this architecture
         instruction_count = mcp._db.get_instruction_count(name)
 
-        # Generate basic architecture info from database
-        arch_info = {
-            "x86_32": {
-                "description": "x86 32-bit instruction set architecture",
-                "word_size": "32",
-                "endianness": "little",
-                "registers": "General purpose: EAX, EBX, ECX, EDX, ESI, EDI, EBP, ESP",
-                "addressing_modes": "immediate, register, memory, indexed",
-            },
-            "x86_64": {
-                "description": "x86 64-bit instruction set architecture",
-                "word_size": "64",
-                "endianness": "little",
-                "registers": "General: RAX, RBX, RCX, RDX, RSI, RDI, RBP, RSP, R8-R15",
-                "addressing_modes": "immediate, register, memory, indexed, rip-rel",
-            },
-        }
+        # Get architecture metadata from database
+        architecture = mcp._db.get_architecture(name)
+        if not architecture:
+            return f"Architecture '{name}' metadata not found in database"
 
-        info = arch_info.get(
-            name,
-            {
-                "description": f"Architecture {name}",
-                "word_size": "Unknown",
-                "endianness": "Unknown",
-                "registers": "Unknown",
-                "addressing_modes": "Unknown",
-            },
-        )
+        # Get registers and addressing modes
+        registers = mcp._db.get_architecture_registers(name)
+        addressing_modes = mcp._db.get_architecture_addressing_modes(name)
 
-        return f"""Architecture: {name}
-Description: {info["description"]}
-Word Size: {info["word_size"]} bits
-Endianness: {info["endianness"]}
-Registers: {info["registers"]}
-Addressing Modes: {info["addressing_modes"]}
-Instructions Available: {instruction_count}"""
+        # Format register information
+        main_gprs = [
+            r for r in registers if r.is_main_register and r.register_class == "gpr"
+        ]
+        main_gpr_names = [r.register_name for r in main_gprs]
+
+        # Get other register classes
+        other_regs = {}
+        for reg in registers:
+            if reg.register_class not in other_regs:
+                other_regs[reg.register_class] = []
+            other_regs[reg.register_class].append(reg.register_name)
+
+        # Format addressing modes
+        mode_descriptions = []
+        for mode in addressing_modes:
+            if mode.example_syntax:
+                mode_descriptions.append(f"{mode.mode_name} ({mode.example_syntax})")
+            else:
+                mode_descriptions.append(mode.mode_name)
+
+        # Build comprehensive architecture info
+        result = f"""Architecture: {name}
+Description: {architecture.description}
+Word Size: {architecture.word_size} bits
+Endianness: {architecture.endianness}
+Machine Mode: {architecture.machine_mode}
+"""
+
+        if main_gpr_names:
+            result += f"General Purpose Registers: {', '.join(main_gpr_names)}\n"
+
+        # Add other register classes
+        for reg_class, reg_names in other_regs.items():
+            if reg_class != "gpr" and reg_names:
+                class_name = reg_class.upper()
+                if len(reg_names) > 8:  # Limit display for large register sets
+                    truncated = ", ".join(reg_names[:8])
+                    total_count = len(reg_names)
+                    result += (
+                        f"{class_name} Registers: {truncated} "
+                        f"... ({total_count} total)\n"
+                    )
+                else:
+                    result += f"{class_name} Registers: {', '.join(reg_names)}\n"
+
+        if mode_descriptions:
+            result += f"Addressing Modes: {', '.join(mode_descriptions)}\n"
+
+        result += f"Instructions Available: {instruction_count}"
+
+        return result
     except Exception as e:
         logging.error(f"Failed to get architecture info: {e}")
         return f"Error accessing architecture information: {e}"
