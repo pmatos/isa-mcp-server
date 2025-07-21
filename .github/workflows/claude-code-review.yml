@@ -17,7 +17,10 @@ jobs:
     #   github.event.pull_request.user.login == 'external-contributor' ||
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-    
+    if: |
+      !contains(github.event.pull_request.title, '[skip-review]') &&
+      !contains(github.event.pull_request.title, '[WIP]')
+
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -67,8 +70,3 @@ jobs:
           #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
           
           allowed_tools: "Bash(npm run:*),Bash(gh:*),Bash(uv run:*),Bash(sqlite3:*),Bash(find:*)"
-  
-          if: |
-            !contains(github.event.pull_request.title, '[skip-review]') &&
-            !contains(github.event.pull_request.title, '[WIP]')
-
