@@ -69,6 +69,42 @@ class InstructionRecord:
             self.attributes = []
 
 
+@dataclass
+class ArchitectureRecord:
+    """Represents architecture metadata."""
+
+    id: Optional[int] = None
+    isa_name: str = ""
+    word_size: int = 0
+    endianness: str = ""
+    description: str = ""
+    machine_mode: str = ""
+
+
+@dataclass
+class RegisterRecord:
+    """Represents a register definition."""
+
+    id: Optional[int] = None
+    architecture_id: int = 0
+    register_name: str = ""
+    register_class: str = ""
+    width_bits: int = 0
+    encoding_id: Optional[int] = None
+    is_main_register: bool = True
+
+
+@dataclass
+class AddressingModeRecord:
+    """Represents an addressing mode."""
+
+    id: Optional[int] = None
+    architecture_id: int = 0
+    mode_name: str = ""
+    description: str = ""
+    example_syntax: str = ""
+
+
 class ISADatabase:
     """Database manager for ISA instruction data."""
 
@@ -218,6 +254,58 @@ class ISADatabase:
                     success BOOLEAN DEFAULT TRUE,
                     error_message TEXT
                 )
+            """)
+
+            # Architecture metadata tables
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS architectures (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    isa_name TEXT NOT NULL UNIQUE,
+                    word_size INTEGER NOT NULL,
+                    endianness TEXT NOT NULL,
+                    description TEXT,
+                    machine_mode TEXT
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS architecture_registers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    architecture_id INTEGER NOT NULL,
+                    register_name TEXT NOT NULL,
+                    register_class TEXT NOT NULL,
+                    width_bits INTEGER NOT NULL,
+                    encoding_id INTEGER,
+                    is_main_register BOOLEAN DEFAULT TRUE,
+                    FOREIGN KEY (architecture_id) REFERENCES architectures(id)
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS architecture_addressing_modes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    architecture_id INTEGER NOT NULL,
+                    mode_name TEXT NOT NULL,
+                    description TEXT,
+                    example_syntax TEXT,
+                    FOREIGN KEY (architecture_id) REFERENCES architectures(id)
+                )
+            """)
+
+            # Indexes for architecture metadata
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_architectures_isa_name
+                ON architectures(isa_name)
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_registers_architecture_id
+                ON architecture_registers(architecture_id)
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_addressing_modes_architecture_id
+                ON architecture_addressing_modes(architecture_id)
             """)
 
             conn.commit()
@@ -375,6 +463,141 @@ class ISADatabase:
             )
             conn.commit()
             return cursor.lastrowid
+
+    def insert_architecture(self, architecture: ArchitectureRecord) -> int:
+        """Insert architecture metadata into database."""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT OR REPLACE INTO architectures (
+                    isa_name, word_size, endianness, description, machine_mode
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    architecture.isa_name,
+                    architecture.word_size,
+                    architecture.endianness,
+                    architecture.description,
+                    architecture.machine_mode,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def insert_register(self, register: RegisterRecord) -> int:
+        """Insert register into database."""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT OR REPLACE INTO architecture_registers (
+                    architecture_id, register_name, register_class, width_bits,
+                    encoding_id, is_main_register
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    register.architecture_id,
+                    register.register_name,
+                    register.register_class,
+                    register.width_bits,
+                    register.encoding_id,
+                    register.is_main_register,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def insert_addressing_mode(self, addressing_mode: AddressingModeRecord) -> int:
+        """Insert addressing mode into database."""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT OR REPLACE INTO architecture_addressing_modes (
+                    architecture_id, mode_name, description, example_syntax
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (
+                    addressing_mode.architecture_id,
+                    addressing_mode.mode_name,
+                    addressing_mode.description,
+                    addressing_mode.example_syntax,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_architecture(self, isa_name: str) -> Optional[ArchitectureRecord]:
+        """Get architecture by ISA name."""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM architectures WHERE isa_name = ?", (isa_name,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return ArchitectureRecord(
+                    id=row["id"],
+                    isa_name=row["isa_name"],
+                    word_size=row["word_size"],
+                    endianness=row["endianness"],
+                    description=row["description"],
+                    machine_mode=row["machine_mode"],
+                )
+            return None
+
+    def get_architecture_registers(self, isa_name: str) -> List[RegisterRecord]:
+        """Get all registers for an architecture."""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT ar.* FROM architecture_registers ar
+                JOIN architectures a ON ar.architecture_id = a.id
+                WHERE a.isa_name = ?
+                ORDER BY ar.register_class, ar.register_name
+                """,
+                (isa_name,),
+            )
+
+            registers = []
+            for row in cursor.fetchall():
+                registers.append(
+                    RegisterRecord(
+                        id=row["id"],
+                        architecture_id=row["architecture_id"],
+                        register_name=row["register_name"],
+                        register_class=row["register_class"],
+                        width_bits=row["width_bits"],
+                        encoding_id=row["encoding_id"],
+                        is_main_register=bool(row["is_main_register"]),
+                    )
+                )
+            return registers
+
+    def get_architecture_addressing_modes(
+        self, isa_name: str
+    ) -> List[AddressingModeRecord]:
+        """Get all addressing modes for an architecture."""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT aam.* FROM architecture_addressing_modes aam
+                JOIN architectures a ON aam.architecture_id = a.id
+                WHERE a.isa_name = ?
+                ORDER BY aam.mode_name
+                """,
+                (isa_name,),
+            )
+
+            modes = []
+            for row in cursor.fetchall():
+                modes.append(
+                    AddressingModeRecord(
+                        id=row["id"],
+                        architecture_id=row["architecture_id"],
+                        mode_name=row["mode_name"],
+                        description=row["description"],
+                        example_syntax=row["example_syntax"],
+                    )
+                )
+            return modes
 
     def _row_to_instruction(self, row: sqlite3.Row) -> InstructionRecord:
         """Convert database row to InstructionRecord."""

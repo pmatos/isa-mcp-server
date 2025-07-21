@@ -25,6 +25,89 @@ cd isa-mcp-server
 uv sync
 ```
 
+## Initial Setup - Importing ISA Data
+
+The server requires ISA instruction and architecture data to be imported into the database. This is now done in a single step:
+
+### Import x86_32 and x86_64 Data
+
+Import both instruction and architecture data from Intel's XED library (included as a submodule):
+
+```bash
+# Import Intel x86_32 and x86_64 instructions and metadata from XED
+python scripts/import_isa_data.py --intel --source-dir External/xed
+
+# Or import all available ISAs (currently only Intel)
+python scripts/import_isa_data.py --all
+```
+
+This will:
+- Parse ~11,000+ instruction definitions from XED datafiles
+- Extract register definitions for both architectures
+- Define addressing modes with examples
+- Set architecture specifications (word size, endianness, machine modes)
+- Populate the database with x86_32 and x86_64 instructions and metadata
+- Create the initial `isa_docs.db` database file
+
+### Import Instructions Only (Optional)
+
+If you only want to import instructions without architecture metadata:
+
+```bash
+# Import only instructions, skip metadata
+python scripts/import_isa_data.py --intel --skip-metadata --source-dir External/xed
+```
+
+### Verification
+
+To verify the import was successful, the script will display a summary:
+
+```
+============================================================
+IMPORT SUMMARY
+============================================================
+✓ INTEL   : 9,865 instructions in 12.3s (including architecture metadata)
+------------------------------------------------------------
+Total: 9,865 instructions in 12.3s
+Database: isa_docs.db
+
+🎉 Import completed successfully!
+```
+
+If you need to verify the architecture metadata separately:
+
+```bash
+# Check architecture metadata details
+python scripts/populate_architecture_metadata.py --db-path isa_docs.db
+
+# You should see output like:
+# X86_32:
+#   Description: Intel x86 32-bit instruction set architecture
+#   Word Size: 32 bits
+#   Registers: 63
+#   Addressing Modes: 9
+#   Main GPRs: EAX, EBP, EBX, ECX, EDI, EDX, ESI, ESP
+#
+# X86_64:
+#   Description: Intel x86 64-bit instruction set architecture
+#   Word Size: 64 bits
+#   Registers: 179
+#   Addressing Modes: 10
+#   Main GPRs: RAX, RBP, RBX, RCX, RDI, RDX, RSI, RSP, R8-R15
+```
+
+### Custom Database Location
+
+To use a custom database location:
+
+```bash
+# Import with custom database path
+python scripts/import_isa_data.py --intel --db-path /path/to/custom.db
+
+# Then run the server with the same path
+uv run python main.py --db-path /path/to/custom.db
+```
+
 ## Usage
 
 Run the MCP server:
@@ -59,9 +142,36 @@ The server provides the following resources:
 
 ## Database Schema
 
-The server uses a SQLite database to store ISA instruction data. The schema includes:
+The server uses a SQLite database to store ISA instruction data and architecture metadata. The schema includes:
 
 ### Main Tables
+
+#### `architectures`
+Stores architecture metadata:
+- `id` (INTEGER PRIMARY KEY) - Unique identifier
+- `isa_name` (TEXT) - Architecture name (e.g., "x86_32", "x86_64")
+- `word_size` (INTEGER) - Word size in bits (32 or 64)
+- `endianness` (TEXT) - Byte order ("little" or "big")
+- `description` (TEXT) - Human-readable description
+- `machine_mode` (TEXT) - Machine mode (e.g., "LEGACY_32", "LONG_64")
+
+#### `architecture_registers`
+Stores register definitions for each architecture:
+- `id` (INTEGER PRIMARY KEY) - Unique identifier
+- `architecture_id` (INTEGER) - Foreign key to architectures table
+- `register_name` (TEXT) - Register name (e.g., "RAX", "EAX")
+- `register_class` (TEXT) - Register type (e.g., "gpr", "xmm", "flags")
+- `width_bits` (INTEGER) - Register width in bits
+- `encoding_id` (INTEGER) - Hardware encoding identifier
+- `is_main_register` (BOOLEAN) - Whether this is a primary register
+
+#### `architecture_addressing_modes`
+Stores addressing modes for each architecture:
+- `id` (INTEGER PRIMARY KEY) - Unique identifier
+- `architecture_id` (INTEGER) - Foreign key to architectures table
+- `mode_name` (TEXT) - Addressing mode name
+- `description` (TEXT) - Mode description
+- `example_syntax` (TEXT) - Example assembly syntax
 
 #### `instructions`
 Stores instruction information with the following fields:
@@ -147,13 +257,19 @@ The database includes indexes for optimal query performance:
 - `idx_instructions_mnemonic` - For instruction name lookups
 - `idx_instructions_category` - For category-based filtering
 - `idx_instructions_extension` - For extension-based filtering
+- `idx_architectures_isa_name` - For architecture lookups
+- `idx_registers_architecture_id` - For register queries by architecture
+- `idx_addressing_modes_architecture_id` - For addressing mode queries
 
 ### Current Data
 
 The database currently contains:
-- **x86 Architecture**: 5,649+ instruction variants covering the complete x86 instruction set
+- **x86_32 Architecture**: 4,314 instruction variants, 63 registers, 9 addressing modes
+- **x86_64 Architecture**: 5,551 instruction variants, 179 registers, 10 addressing modes
 - Full-text search capability across all instruction data
 - Comprehensive operand, encoding, and flag information
+- Complete register specifications including GPRs, SIMD, control, and debug registers
+- Detailed addressing mode definitions with example syntax
 
 ## Development
 

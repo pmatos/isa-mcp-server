@@ -44,7 +44,9 @@ class ISAImporter(ABC):
         """Get version information from source files."""
         pass
 
-    async def import_from_source(self, source_dir: Path) -> Dict[str, Any]:
+    async def import_from_source(
+        self, source_dir: Path, skip_metadata: bool = False
+    ) -> Dict[str, Any]:
         """Import instructions from source directory."""
         if not source_dir.exists():
             raise FileNotFoundError(f"Source directory not found: {source_dir}")
@@ -62,6 +64,16 @@ class ISAImporter(ABC):
 
         try:
             source_version = self.get_source_version(source_dir)
+
+            # Import architecture metadata first (if supported and not skipped)
+            if not skip_metadata and hasattr(self, "populate_architecture_metadata"):
+                self.logger.info("Importing architecture metadata...")
+                metadata_success = await self.populate_architecture_metadata(source_dir)
+                if not metadata_success:
+                    self.logger.warning(
+                        "Architecture metadata import failed, "
+                        "continuing with instructions"
+                    )
 
             # Parse and insert instructions
             async for instruction in self.parse_sources(source_dir):
@@ -109,12 +121,18 @@ class ISAImporter(ABC):
                 f"inserted in {duration:.2f} seconds"
             )
 
-            return {
+            result = {
                 "success": True,
                 "duration_seconds": duration,
                 "stats": self.stats.copy(),
                 "source_version": source_version,
             }
+
+            # Add metadata info if available
+            if hasattr(self, "_arch_metadata_populated"):
+                result["metadata_imported"] = self._arch_metadata_populated
+
+            return result
 
         except Exception as e:
             duration = time.time() - start_time
