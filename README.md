@@ -22,6 +22,7 @@ The server is designed to easily support additional architectures in the future.
 ```bash
 git clone https://github.com/yourusername/isa-mcp-server.git
 cd isa-mcp-server
+git submodule update --init --recursive
 uv sync
 ```
 
@@ -37,25 +38,51 @@ Import both instruction and architecture data from Intel's XED library (included
 # Import Intel x86_32 and x86_64 instructions and metadata from XED
 python scripts/import_isa_data.py --intel --source-dir External/xed
 
-# Or import all available ISAs (currently only Intel)
+# Or import all available ISAs
 python scripts/import_isa_data.py --all
 ```
 
 This will:
-- Parse ~11,000+ instruction definitions from XED datafiles
-- Extract register definitions for both architectures
+- Parse ~11,000+ instruction definitions from XED datafiles for Intel architectures
+- Import ~1,000+ instruction definitions from ARM machine-readable data for AArch64
+- Extract register definitions for all architectures
 - Define addressing modes with examples
 - Set architecture specifications (word size, endianness, machine modes)
-- Populate the database with x86_32 and x86_64 instructions and metadata
+- Populate the database with x86_32, x86_64, and aarch64 instructions and metadata
 - Create the initial `isa_docs.db` database file
+
+### Import AArch64 Data
+
+Import ARM AArch64 instruction and architecture data from ARM's machine-readable data (included as a submodule):
+
+```bash
+# Import ARM AArch64 instructions and metadata
+python scripts/import_isa_data.py --arm --source-dir External/arm-machine-readable
+
+# Or import with custom database path
+python scripts/import_isa_data.py --arm --source-dir External/arm-machine-readable --db-path custom.db
+```
+
+### Import Both Intel and ARM
+
+```bash
+# Import all available architectures
+python scripts/import_isa_data.py --all
+
+# Or import both explicitly
+python scripts/import_isa_data.py --intel --arm
+```
 
 ### Import Instructions Only (Optional)
 
 If you only want to import instructions without architecture metadata:
 
 ```bash
-# Import only instructions, skip metadata
+# Import only Intel instructions, skip metadata
 python scripts/import_isa_data.py --intel --skip-metadata --source-dir External/xed
+
+# Import only ARM instructions, skip metadata
+python scripts/import_isa_data.py --arm --skip-metadata --source-dir External/arm-machine-readable
 ```
 
 ### Verification
@@ -67,8 +94,9 @@ To verify the import was successful, the script will display a summary:
 IMPORT SUMMARY
 ============================================================
 ✓ INTEL   : 9,865 instructions in 12.3s (including architecture metadata)
+✓ ARM     : 1,247 instructions in 8.7s (including architecture metadata)
 ------------------------------------------------------------
-Total: 9,865 instructions in 12.3s
+Total: 11,112 instructions in 21.0s
 Database: isa_docs.db
 
 🎉 Import completed successfully!
@@ -266,10 +294,12 @@ The database includes indexes for optimal query performance:
 The database currently contains:
 - **x86_32 Architecture**: 4,314 instruction variants, 63 registers, 9 addressing modes
 - **x86_64 Architecture**: 5,551 instruction variants, 179 registers, 10 addressing modes
+- **AArch64 Architecture**: 1,247+ instruction variants, 259 registers, 10 addressing modes
 - Full-text search capability across all instruction data
 - Comprehensive operand, encoding, and flag information
 - Complete register specifications including GPRs, SIMD, control, and debug registers
 - Detailed addressing mode definitions with example syntax
+- Cross-architecture instruction comparison support
 
 ## Development
 
@@ -293,16 +323,32 @@ uv run ruff format src/
 
 ### Testing
 
+Run the full test suite:
+
+```bash
+# Run all tests
+uv run python -m pytest
+
+# Run only unit tests
+uv run python -m pytest tests/unit/
+
+# Run only integration tests
+uv run python -m pytest tests/integration/
+
+# Run with verbose output
+uv run python -m pytest -v
+```
+
 Test server creation and database connectivity:
 
 ```bash
 uv run python -c "from src.isa_mcp_server.server import create_mcp_server; mcp = create_mcp_server(); print('Server created successfully')"
 ```
 
-Test with custom database path:
+Test ARM importer functionality:
 
 ```bash
-uv run python -c "from src.isa_mcp_server.server import create_mcp_server; mcp = create_mcp_server('isa_docs.db'); print('Server created successfully')"
+uv run python -c "from src.isa_mcp_server.importers.arm_importer import ARMImporter; from src.isa_mcp_server.isa_database import ISADatabase; db = ISADatabase(':memory:'); importer = ARMImporter(db); print('ARM importer created successfully')"
 ```
 
 ### Testing with MCP Inspector

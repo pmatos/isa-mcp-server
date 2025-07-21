@@ -1,3 +1,6 @@
 [submodule "External/xed"]
 	path = External/xed
 	url = https://github.com/intelxed/xed.git
+[submodule "External/arm-machine-readable"]
+	path = External/arm-machine-readable
+	url = https://github.com/pmatos/ARM-A-MachineReadable.git

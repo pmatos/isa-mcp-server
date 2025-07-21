@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from isa_mcp_server.isa_database import ISADatabase
 from isa_mcp_server.importers.base import importer_registry
 from isa_mcp_server.importers.xed_importer import XEDImporter
+from isa_mcp_server.importers.arm_importer import ARMImporter
 
 
 def setup_logging(verbose: bool = False):
@@ -65,10 +66,27 @@ async def import_intel_data(
     return result
 
 
-async def import_arm_data(db: ISADatabase, source_dir: Path) -> Dict:
-    """Import ARM data (placeholder for future implementation)."""
-    logging.warning("ARM importer not yet implemented")
-    return {'success': False, 'error': 'ARM importer not implemented'}
+async def import_arm_data(db: ISADatabase, source_dir: Path, skip_metadata: bool = False) -> Dict:
+    """Import ARM AArch64 data from machine-readable JSON files."""
+    logging.info(f"Importing ARM AArch64 data from {source_dir}")
+    
+    importer = ARMImporter(db)
+    result = await importer.import_from_source(source_dir, skip_metadata=skip_metadata)
+    
+    if result['success']:
+        instr_count = result['stats']['instructions_inserted']
+        metadata_msg = ""
+        if 'metadata_imported' in result and result['metadata_imported']:
+            metadata_msg = " (including architecture metadata)"
+        elif skip_metadata:
+            metadata_msg = " (metadata skipped)"
+        logging.info(
+            f"ARM import successful: {instr_count} instructions imported{metadata_msg}"
+        )
+    else:
+        logging.error(f"ARM import failed: {result['error']}")
+    
+    return result
 
 
 async def import_riscv_data(db: ISADatabase, source_dir: Path) -> Dict:
@@ -122,7 +140,7 @@ Examples:
     parser.add_argument(
         '--arm',
         action='store_true',
-        help='Import ARM instructions (future)'
+        help='Import ARM AArch64 instructions'
     )
     
     parser.add_argument(
@@ -148,7 +166,8 @@ Examples:
     parser.add_argument(
         '--arm-source-dir',
         type=Path,
-        help='Source directory for ARM data'
+        default=Path('External/arm-machine-readable'),
+        help='Source directory for ARM data (default: External/arm-machine-readable)'
     )
     
     parser.add_argument(
@@ -223,7 +242,7 @@ Examples:
             logging.error(f"ARM source directory not found: {source_dir}")
             overall_success = False
         else:
-            results['arm'] = await import_arm_data(db, source_dir)
+            results['arm'] = await import_arm_data(db, source_dir, skip_metadata=args.skip_metadata)
             if not results['arm']['success']:
                 overall_success = False
     
