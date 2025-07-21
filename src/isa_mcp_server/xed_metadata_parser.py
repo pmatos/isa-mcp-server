@@ -1,9 +1,12 @@
 """XED metadata parser for extracting architecture information."""
 
+import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 from .isa_database import AddressingModeRecord, ArchitectureRecord, RegisterRecord
+
+logger = logging.getLogger(__name__)
 
 
 class XEDMetadataParser:
@@ -50,10 +53,13 @@ class XEDMetadataParser:
         x86_32_registers = []
         x86_64_registers = []
 
-        with open(self.registers_file, "r") as f:
-            lines = f.readlines()
+        try:
+            with open(self.registers_file, "r") as f:
+                lines = f.readlines()
+        except Exception as e:
+            raise RuntimeError(f"Failed to read register file: {e}")
 
-        for line in lines:
+        for line_num, line in enumerate(lines, 1):
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
@@ -61,27 +67,51 @@ class XEDMetadataParser:
             # Parse register definition
             # Format: name class width max-enclosing-reg-64b/32b-mode regid [h]
             parts = line.split()
-            if len(parts) < 4:
+            if len(parts) < 3:
+                # Log warning but continue processing
+                logger.warning(
+                    f"Malformed register definition at line {line_num}: {line}"
+                )
                 continue
 
-            reg_name = parts[0]
-            reg_class = parts[1]
-            width_str = parts[2]
-            encoding_id = (
-                int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else None
-            )
-
-            # Skip invalid registers
-            if reg_class == "INVALID":
-                continue
-
-            # Parse width
             try:
+                reg_name = parts[0]
+                reg_class = parts[1] if len(parts) > 1 else "UNKNOWN"
+                width_str = parts[2] if len(parts) > 2 else "0"
+
+                # Validate register name
+                if not reg_name or not reg_name.replace("_", "").isalnum():
+                    logger.warning(
+                        f"Invalid register name at line {line_num}: {reg_name}"
+                    )
+                    continue
+
+                # Extract encoding ID if present
+                encoding_id = None
+                if len(parts) > 4 and parts[4].isdigit():
+                    try:
+                        encoding_id = int(parts[4])
+                    except ValueError:
+                        encoding_id = None
+
+                # Skip invalid registers
+                if reg_class == "INVALID":
+                    continue
+
+                # Parse width with validation
                 if "/" in width_str:
                     width = int(width_str.split("/")[0])
                 else:
                     width = int(width_str)
-            except ValueError:
+
+                if width <= 0 or width > 512:  # Sanity check for register width
+                    logger.warning(
+                        f"Invalid register width at line {line_num}: {width}"
+                    )
+                    continue
+
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse register at line {line_num}: {e}")
                 continue
 
             # Determine architecture availability
