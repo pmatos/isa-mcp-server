@@ -125,3 +125,7 @@ GitHub Actions workflow runs on push to main/develop and PRs to main:
 # ISA information
 
 * The submodule `External/xed` contains information about the Intel x86_32/x86_64 ISA.
+
+## Development References
+
+* Use context7 to access documentation on fastmcp and other libraries.
