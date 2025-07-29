@@ -166,7 +166,6 @@ The server provides the following resources:
 ## Tools
 
 - `search_instructions` - Search for instructions by name or description
-- `compare_instructions` - Compare instruction implementations across architectures
 
 ## Database Schema
 
@@ -365,7 +364,7 @@ npm install
 
 This will open a web interface where you can:
 - Test resources like `isa://architectures` and `isa://instructions/x86_64`
-- Call tools like `search_instructions` and `compare_instructions`
+- Call tools like `search_instructions`
 - See the server's responses in real-time
 
 ## License

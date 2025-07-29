@@ -102,10 +102,11 @@ class XEDMetadataParser:
                 if width_str == "NA":
                     # Skip registers with undefined width
                     logger.warning(
-                        f"Skipping register with undefined width at line {line_num}: {reg_name}"
+                        f"Skipping register with undefined width at line "
+                        f"{line_num}: {reg_name}"
                     )
                     continue
-                
+
                 try:
                     if "/" in width_str:
                         width = int(width_str.split("/")[0])
@@ -113,7 +114,8 @@ class XEDMetadataParser:
                         width = int(width_str)
                 except ValueError:
                     logger.warning(
-                        f"Failed to parse register width at line {line_num}: {width_str}"
+                        f"Failed to parse register width at line "
+                        f"{line_num}: {width_str}"
                     )
                     continue
 

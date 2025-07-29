@@ -78,9 +78,9 @@ class ARMInstructionParser:
         """Recursively process instruction hierarchy to find actual instructions."""
         if not isinstance(obj, dict):
             return
-        
+
         obj_type = obj.get("_type", "")
-        
+
         if obj_type == "Instruction.Instruction":
             # This is an actual instruction - parse it
             name = obj.get("name", "UNKNOWN")
@@ -91,7 +91,7 @@ class ARMInstructionParser:
             except Exception:
                 # Continue processing other instructions
                 pass
-                
+
         elif obj_type in ["Instruction.InstructionSet", "Instruction.InstructionGroup"]:
             # This is a container - recurse into children
             children = obj.get("children", [])
@@ -200,7 +200,10 @@ class ARMInstructionParser:
         """Extract instruction mnemonic from name and data."""
         # Try to extract from assembly field first
         assembly = instruction_data.get("assembly", {})
-        if isinstance(assembly, dict) and assembly.get("_type") == "Instruction.Assembly":
+        if (
+            isinstance(assembly, dict)
+            and assembly.get("_type") == "Instruction.Assembly"
+        ):
             symbols = assembly.get("symbols", [])
             if symbols and isinstance(symbols[0], dict):
                 first_symbol = symbols[0]
@@ -218,7 +221,7 @@ class ARMInstructionParser:
         title = instruction_data.get("title", "")
         if title and isinstance(title, str):
             return title.strip()
-            
+
         # Try description object
         description_obj = instruction_data.get("description", {})
         if isinstance(description_obj, dict):

@@ -65,7 +65,6 @@ This is an **MCP (Model Context Protocol) server** built with **FastMCP** that p
   - `isa://instruction/{arch}/{name}` - Get instruction details
 - **Tools**: Callable functions for interactive operations
   - `search_instructions` - Search by name/description with optional architecture filter
-  - `compare_instructions` - Compare instruction implementations across architectures
 
 **Data Models**:
 - `InstructionInfo`: Pydantic model for instruction metadata (name, description, syntax, operands, flags, examples)
