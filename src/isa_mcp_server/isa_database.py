@@ -93,6 +93,12 @@ class RegisterRecord:
     encoding_id: Optional[int] = None
     is_main_register: bool = True
 
+    # ISA-agnostic extensions for aliasing and calling conventions
+    parent_register_id: Optional[int] = None
+    aliases_json: str = ""
+    calling_convention_preserved: Optional[bool] = None
+    register_purpose: Optional[str] = None
+
 
 @dataclass
 class AddressingModeRecord:
@@ -277,7 +283,13 @@ class ISADatabase:
                     width_bits INTEGER NOT NULL,
                     encoding_id INTEGER,
                     is_main_register BOOLEAN DEFAULT TRUE,
-                    FOREIGN KEY (architecture_id) REFERENCES architectures(id)
+                    parent_register_id INTEGER,
+                    aliases_json TEXT DEFAULT '[]',
+                    calling_convention_preserved BOOLEAN,
+                    register_purpose TEXT,
+                    FOREIGN KEY (architecture_id) REFERENCES architectures(id),
+                    FOREIGN KEY (parent_register_id)
+                        REFERENCES architecture_registers(id)
                 )
             """)
 
@@ -306,6 +318,17 @@ class ISADatabase:
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_addressing_modes_architecture_id
                 ON architecture_addressing_modes(architecture_id)
+            """)
+
+            # Additional indexes for new register fields
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_registers_parent_id
+                ON architecture_registers(parent_register_id)
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_registers_purpose
+                ON architecture_registers(register_purpose)
             """)
 
             conn.commit()
@@ -491,8 +514,9 @@ class ISADatabase:
                 """
                 INSERT OR REPLACE INTO architecture_registers (
                     architecture_id, register_name, register_class, width_bits,
-                    encoding_id, is_main_register
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    encoding_id, is_main_register, parent_register_id, aliases_json,
+                    calling_convention_preserved, register_purpose
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     register.architecture_id,
@@ -501,6 +525,10 @@ class ISADatabase:
                     register.width_bits,
                     register.encoding_id,
                     register.is_main_register,
+                    register.parent_register_id,
+                    register.aliases_json,
+                    register.calling_convention_preserved,
+                    register.register_purpose,
                 ),
             )
             conn.commit()
@@ -585,6 +613,14 @@ class ISADatabase:
                         width_bits=row["width_bits"],
                         encoding_id=row["encoding_id"],
                         is_main_register=bool(row["is_main_register"]),
+                        parent_register_id=row["parent_register_id"],
+                        aliases_json=row["aliases_json"] or "[]",
+                        calling_convention_preserved=(
+                            bool(row["calling_convention_preserved"])
+                            if row["calling_convention_preserved"] is not None
+                            else None
+                        ),
+                        register_purpose=row["register_purpose"],
                     )
                 )
             return registers
@@ -660,3 +696,98 @@ class ISADatabase:
             added_version=row["added_version"],
             deprecated=bool(row["deprecated"]),
         )
+
+    def get_register_with_aliases(
+        self, isa_name: str, register_name: str
+    ) -> Optional[RegisterRecord]:
+        """Get register with all alias information."""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT ar.* FROM architecture_registers ar
+                JOIN architectures a ON ar.architecture_id = a.id
+                WHERE a.isa_name = ? AND ar.register_name = ?
+                """,
+                (isa_name, register_name),
+            )
+            row = cursor.fetchone()
+            if row:
+                return RegisterRecord(
+                    id=row["id"],
+                    architecture_id=row["architecture_id"],
+                    register_name=row["register_name"],
+                    register_class=row["register_class"],
+                    width_bits=row["width_bits"],
+                    encoding_id=row["encoding_id"],
+                    is_main_register=bool(row["is_main_register"]),
+                    parent_register_id=row["parent_register_id"],
+                    aliases_json=row["aliases_json"] or "[]",
+                    calling_convention_preserved=(
+                        bool(row["calling_convention_preserved"])
+                        if row["calling_convention_preserved"] is not None
+                        else None
+                    ),
+                    register_purpose=row["register_purpose"],
+                )
+            return None
+
+    def get_architecture_registers_with_aliases(
+        self, isa_name: str
+    ) -> List[RegisterRecord]:
+        """Get all registers with alias information for architecture."""
+        return self.get_architecture_registers(isa_name)
+
+    def get_register_family(self, register_id: int) -> List[RegisterRecord]:
+        """Get complete register family (main + all aliases)."""
+        with self.get_connection() as conn:
+            # Get the main register first
+            cursor = conn.execute(
+                "SELECT * FROM architecture_registers WHERE id = ?", (register_id,)
+            )
+            main_reg_row = cursor.fetchone()
+            if not main_reg_row:
+                return []
+
+            # Find the root parent (main register)
+            parent_id = main_reg_row["parent_register_id"]
+            if parent_id:
+                # This is a sub-register, find the parent
+                cursor = conn.execute(
+                    "SELECT * FROM architecture_registers WHERE id = ?", (parent_id,)
+                )
+                parent_row = cursor.fetchone()
+                if parent_row:
+                    main_reg_row = parent_row
+
+            # Now get all registers in the family
+            cursor = conn.execute(
+                """
+                SELECT * FROM architecture_registers
+                WHERE id = ? OR parent_register_id = ?
+                ORDER BY width_bits DESC
+                """,
+                (main_reg_row["id"], main_reg_row["id"]),
+            )
+
+            family = []
+            for row in cursor.fetchall():
+                family.append(
+                    RegisterRecord(
+                        id=row["id"],
+                        architecture_id=row["architecture_id"],
+                        register_name=row["register_name"],
+                        register_class=row["register_class"],
+                        width_bits=row["width_bits"],
+                        encoding_id=row["encoding_id"],
+                        is_main_register=bool(row["is_main_register"]),
+                        parent_register_id=row["parent_register_id"],
+                        aliases_json=row["aliases_json"] or "[]",
+                        calling_convention_preserved=(
+                            bool(row["calling_convention_preserved"])
+                            if row["calling_convention_preserved"] is not None
+                            else None
+                        ),
+                        register_purpose=row["register_purpose"],
+                    )
+                )
+            return family
