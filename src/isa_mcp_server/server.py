@@ -54,7 +54,7 @@ def create_mcp_server(db_path: str = "isa_docs.db") -> FastMCP:
 
 def _register_handlers(server: FastMCP):
     """Register all handlers (resources and tools) on the given server."""
-    
+
     @server.resource("isa://architectures")
     async def list_architectures() -> str:
         """List all supported instruction set architectures."""
@@ -106,7 +106,9 @@ def _register_handlers(server: FastMCP):
             mode_descriptions = []
             for mode in addressing_modes:
                 if mode.example_syntax:
-                    mode_descriptions.append(f"{mode.mode_name} ({mode.example_syntax})")
+                    mode_descriptions.append(
+                        f"{mode.mode_name} ({mode.example_syntax})"
+                    )
                 else:
                     mode_descriptions.append(mode.mode_name)
 
@@ -197,7 +199,9 @@ Examples:
             return f"Error accessing instruction '{name}' for '{arch}': {e}"
 
     @server.tool("search_instructions")
-    async def search_instructions(query: str, architecture: Optional[str] = None) -> str:
+    async def search_instructions(
+        query: str, architecture: Optional[str] = None
+    ) -> str:
         """Search for instructions by name or description."""
         try:
             instructions = server._db.search_instructions(query, architecture)
@@ -205,28 +209,15 @@ Examples:
             if instructions:
                 results = []
                 for instr in instructions:
-                    results.append(f"{instr.isa}: {instr.mnemonic} - {instr.description}")
+                    results.append(
+                        f"{instr.isa}: {instr.mnemonic} - {instr.description}"
+                    )
                 return "\n".join(results)
             else:
                 return f"No instructions found matching '{query}'"
         except Exception as e:
             logging.error(f"Failed to search instructions in database: {e}")
             return f"Error searching instructions: {e}"
-
-    @server.tool("compare_instructions")
-    async def compare_instructions(instruction: str, arch1: str, arch2: str) -> str:
-        """Compare how an instruction is implemented across different architectures."""
-        try:
-            info1 = await get_instruction_info(arch1, instruction)
-            info2 = await get_instruction_info(arch2, instruction)
-
-            return (
-                f"Comparison of '{instruction}' instruction:\n\n"
-                f"{arch1}:\n{info1}\n\n{arch2}:\n{info2}"
-            )
-        except Exception as e:
-            logging.error(f"Error comparing instructions: {e}")
-            return f"Error comparing instructions: {str(e)}"
 
 
 # Default server instance for backward compatibility
