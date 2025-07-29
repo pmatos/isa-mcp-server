@@ -1,7 +1,8 @@
 """ISA MCP Server implementation."""
 
+import json
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 
 from fastmcp import FastMCP
 from pydantic import BaseModel
@@ -31,6 +32,218 @@ class ArchitectureInfo(BaseModel):
     addressing_modes: List[str]
 
 
+# ISA-agnostic register type mapping
+REGISTER_TYPE_MAPPING: Dict[str, str] = {
+    # x86/x64 classes
+    "gpr": "general-purpose",
+    "flags": "flags",
+    "segment": "segment",
+    "control": "control",
+    "debug": "debug",
+    "mmx": "multimedia",
+    "x87": "floating-point",
+    "simd": "vector",
+    # AArch64 classes
+    "gpr64": "general-purpose",
+    "gpr32": "general-purpose",
+    "vector": "vector",
+    "system": "system",
+    # RISC-V classes (future)
+    "integer": "general-purpose",
+    "float": "floating-point",
+    "csr": "control-status",
+    # Generic fallback
+    "unknown": "special-purpose",
+}
+
+# ISA-specific calling conventions
+CALLING_CONVENTIONS: Dict[str, Dict[str, Set[str]]] = {
+    "x86_64": {
+        "preserved": {
+            "rbx",
+            "rsp",
+            "rbp",
+            "r12",
+            "r13",
+            "r14",
+            "r15",
+            # Sub-registers are also preserved
+            "ebx",
+            "esp",
+            "ebp",
+            "r12d",
+            "r13d",
+            "r14d",
+            "r15d",
+            "bx",
+            "sp",
+            "bp",
+            "r12w",
+            "r13w",
+            "r14w",
+            "r15w",
+            "bl",
+            "bh",
+            "spl",
+            "bpl",
+            "r12b",
+            "r13b",
+            "r14b",
+            "r15b",
+        },
+        "volatile": {
+            "rax",
+            "rcx",
+            "rdx",
+            "rsi",
+            "rdi",
+            "r8",
+            "r9",
+            "r10",
+            "r11",
+            # Sub-registers are also volatile
+            "eax",
+            "ecx",
+            "edx",
+            "esi",
+            "edi",
+            "r8d",
+            "r9d",
+            "r10d",
+            "r11d",
+            "ax",
+            "cx",
+            "dx",
+            "si",
+            "di",
+            "r8w",
+            "r9w",
+            "r10w",
+            "r11w",
+            "al",
+            "ah",
+            "cl",
+            "ch",
+            "dl",
+            "dh",
+            "sil",
+            "dil",
+            "r8b",
+            "r9b",
+            "r10b",
+            "r11b",
+        },
+    },
+    "x86_32": {
+        "preserved": {
+            "ebx",
+            "esi",
+            "edi",
+            "ebp",
+            "esp",
+            # Sub-registers
+            "bx",
+            "si",
+            "di",
+            "bp",
+            "sp",
+            "bl",
+            "bh",
+            "sil",
+            "dil",
+            "bpl",
+            "spl",
+        },
+        "volatile": {
+            "eax",
+            "ecx",
+            "edx",
+            # Sub-registers
+            "ax",
+            "cx",
+            "dx",
+            "al",
+            "ah",
+            "cl",
+            "ch",
+            "dl",
+            "dh",
+        },
+    },
+    "aarch64": {
+        "preserved": {
+            "x19",
+            "x20",
+            "x21",
+            "x22",
+            "x23",
+            "x24",
+            "x25",
+            "x26",
+            "x27",
+            "x28",
+            "sp",
+            "x29",
+            "x30",
+            # 32-bit versions
+            "w19",
+            "w20",
+            "w21",
+            "w22",
+            "w23",
+            "w24",
+            "w25",
+            "w26",
+            "w27",
+            "w28",
+            "w29",
+            "w30",
+        },
+        "volatile": {
+            "x0",
+            "x1",
+            "x2",
+            "x3",
+            "x4",
+            "x5",
+            "x6",
+            "x7",
+            "x8",
+            "x9",
+            "x10",
+            "x11",
+            "x12",
+            "x13",
+            "x14",
+            "x15",
+            "x16",
+            "x17",
+            "x18",
+            # 32-bit versions
+            "w0",
+            "w1",
+            "w2",
+            "w3",
+            "w4",
+            "w5",
+            "w6",
+            "w7",
+            "w8",
+            "w9",
+            "w10",
+            "w11",
+            "w12",
+            "w13",
+            "w14",
+            "w15",
+            "w16",
+            "w17",
+            "w18",
+        },
+    },
+}
+
+
 def create_mcp_server(db_path: str = "isa_docs.db") -> FastMCP:
     """Create and configure MCP server with database."""
     server = FastMCP("ISA MCP Server")
@@ -58,7 +271,6 @@ def _register_handlers(server: FastMCP):
     @server.resource("isa://architectures")
     async def list_architectures() -> str:
         """List all supported instruction set architectures."""
-        import json
 
         try:
             architectures = server._db.get_supported_isas()
@@ -206,7 +418,6 @@ Examples:
     @server.resource("isa://architectures/{arch}/instruction-groups")
     async def get_instruction_groups(arch: str) -> str:
         """Get instructions grouped by functional category for an architecture."""
-        import json
 
         try:
             # Check if architecture exists
@@ -245,6 +456,97 @@ Examples:
             error_result = {
                 "error": f"Error accessing instruction groups for '{arch}': {e}"
             }
+            return json.dumps(error_result)
+
+    @server.resource("isa://architectures/{arch}/registers")
+    async def get_architecture_registers(arch: str) -> str:
+        """Get complete register definitions with aliases for an architecture."""
+
+        try:
+            # Check if architecture exists
+            supported_isas = server._db.get_supported_isas()
+            if arch not in supported_isas:
+                error_result = {"error": f"Architecture '{arch}' not found"}
+                return json.dumps(error_result)
+
+            # Get all registers with alias information for this architecture
+            registers = server._db.get_architecture_registers_with_aliases(arch)
+
+            if not registers:
+                result = {"registers": []}
+                return json.dumps(result)
+
+            # Build register definitions with ISA-agnostic information
+            register_definitions = []
+
+            for register in registers:
+                # Parse aliases from JSON
+                aliases = []
+                try:
+                    if register.aliases_json:
+                        aliases = json.loads(register.aliases_json)
+                except (json.JSONDecodeError, TypeError):
+                    aliases = []
+
+                # Map register class to user-friendly type
+                register_type = REGISTER_TYPE_MAPPING.get(
+                    register.register_class, "special-purpose"
+                )
+
+                # Determine calling convention preservation
+                preservation_status = None
+                calling_convention = CALLING_CONVENTIONS.get(arch, {})
+                preserved_regs = calling_convention.get("preserved", set())
+                volatile_regs = calling_convention.get("volatile", set())
+                if register.register_name.lower() in preserved_regs:
+                    preservation_status = "preserved"
+                elif register.register_name.lower() in volatile_regs:
+                    preservation_status = "volatile"
+
+                # Override with database value if explicitly set
+                if register.calling_convention_preserved is not None:
+                    preservation_status = (
+                        "preserved"
+                        if register.calling_convention_preserved
+                        else "volatile"
+                    )
+
+                # Build register definition
+                reg_def = {
+                    "name": register.register_name,
+                    "type": register_type,
+                    "width_bits": register.width_bits,
+                    "is_main_register": register.is_main_register,
+                    "aliases": aliases,
+                    "calling_convention": preservation_status,
+                    "purpose": register.register_purpose,
+                }
+
+                # Add encoding information if available
+                if register.encoding_id is not None:
+                    reg_def["encoding_id"] = register.encoding_id
+
+                # Add parent register reference if this is a sub-register
+                if register.parent_register_id is not None:
+                    # Find parent register name
+                    parent_reg = next(
+                        (r for r in registers if r.id == register.parent_register_id),
+                        None,
+                    )
+                    if parent_reg:
+                        reg_def["parent_register"] = parent_reg.register_name
+
+                register_definitions.append(reg_def)
+
+            # Sort registers by type, then by name
+            register_definitions.sort(key=lambda r: (r["type"], r["name"]))
+
+            result = {"registers": register_definitions}
+            return json.dumps(result)
+
+        except Exception as e:
+            logging.error(f"Failed to get registers from database: {e}")
+            error_result = {"error": f"Error accessing registers for '{arch}': {e}"}
             return json.dumps(error_result)
 
     @server.tool("search_instructions")
