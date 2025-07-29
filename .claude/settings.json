@@ -10,10 +10,12 @@
       "Bash(find:*)",
       "Bash(sqlite3:*)",
       "Bash(gh pr:*)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      mcp__context7
     ],
     "defaultMode": "plan"
   },
   "model": "claude-sonnet-4.5",
   "enableAllProjectMcpServers": true
 }
+
