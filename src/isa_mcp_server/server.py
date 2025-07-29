@@ -219,6 +219,19 @@ Examples:
             logging.error(f"Failed to search instructions in database: {e}")
             return f"Error searching instructions: {e}"
 
+    @server.tool("list_architectures")
+    async def list_architectures() -> str:
+        """List all supported instruction set architectures."""
+        try:
+            architectures = server._db.get_supported_isas()
+            if architectures:
+                return "\n".join(f"- {arch}" for arch in sorted(architectures))
+            else:
+                return "No architectures found in database"
+        except Exception as e:
+            logging.error(f"Failed to get architectures from database: {e}")
+            return f"Error accessing database: {e}"
+
 
 # Default server instance for backward compatibility
 mcp = create_mcp_server()
