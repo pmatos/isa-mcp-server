@@ -99,10 +99,23 @@ class XEDMetadataParser:
                     continue
 
                 # Parse width with validation
-                if "/" in width_str:
-                    width = int(width_str.split("/")[0])
-                else:
-                    width = int(width_str)
+                if width_str == "NA":
+                    # Skip registers with undefined width
+                    logger.warning(
+                        f"Skipping register with undefined width at line {line_num}: {reg_name}"
+                    )
+                    continue
+                
+                try:
+                    if "/" in width_str:
+                        width = int(width_str.split("/")[0])
+                    else:
+                        width = int(width_str)
+                except ValueError:
+                    logger.warning(
+                        f"Failed to parse register width at line {line_num}: {width_str}"
+                    )
+                    continue
 
                 if width <= 0 or width > 512:  # Sanity check for register width
                     logger.warning(

@@ -9,7 +9,6 @@ Usage:
     python import_isa_data.py --all
     python import_isa_data.py --intel --source-dir External/xed
     python import_isa_data.py --arm --source-dir /path/to/arm/docs
-    python import_isa_data.py --riscv --source-dir /path/to/riscv/docs
 """
 
 import argparse
@@ -89,10 +88,6 @@ async def import_arm_data(db: ISADatabase, source_dir: Path, skip_metadata: bool
     return result
 
 
-async def import_riscv_data(db: ISADatabase, source_dir: Path) -> Dict:
-    """Import RISC-V data (placeholder for future implementation)."""
-    logging.warning("RISC-V importer not yet implemented")
-    return {'success': False, 'error': 'RISC-V importer not implemented'}
 
 
 async def main():
@@ -105,8 +100,7 @@ Examples:
   %(prog)s --all                                    # Import all available ISAs with metadata
   %(prog)s --intel --source-dir External/xed       # Import Intel x86_32/x86_64 from XED
   %(prog)s --intel --skip-metadata                 # Import Intel instructions only
-  %(prog)s --arm --source-dir /path/to/arm         # Import ARM (future)
-  %(prog)s --riscv --source-dir /path/to/riscv     # Import RISC-V (future)
+  %(prog)s --arm --source-dir /path/to/arm         # Import ARM AArch64
   %(prog)s --intel --db-path custom.db             # Use custom database path
         """
     )
@@ -143,11 +137,6 @@ Examples:
         help='Import ARM AArch64 instructions'
     )
     
-    parser.add_argument(
-        '--riscv',
-        action='store_true',
-        help='Import RISC-V instructions (future)'
-    )
     
     # Source directories
     parser.add_argument(
@@ -170,11 +159,6 @@ Examples:
         help='Source directory for ARM data (default: External/arm-machine-readable)'
     )
     
-    parser.add_argument(
-        '--riscv-source-dir',
-        type=Path,
-        help='Source directory for RISC-V data'
-    )
     
     # Logging options
     parser.add_argument(
@@ -204,8 +188,8 @@ Examples:
         setup_logging(args.verbose)
     
     # Validate arguments
-    if not any([args.all, args.intel, args.arm, args.riscv]):
-        parser.error("Must specify at least one ISA to import (--all, --intel, --arm, or --riscv)")
+    if not any([args.all, args.intel, args.arm]):
+        parser.error("Must specify at least one ISA to import (--all, --intel, or --arm)")
     
     # Initialize database
     db = ISADatabase(args.db_path)
@@ -246,16 +230,6 @@ Examples:
             if not results['arm']['success']:
                 overall_success = False
     
-    # Import RISC-V (future)
-    if args.all or args.riscv:
-        source_dir = args.source_dir or args.riscv_source_dir
-        if not source_dir or not source_dir.exists():
-            logging.error(f"RISC-V source directory not found: {source_dir}")
-            overall_success = False
-        else:
-            results['riscv'] = await import_riscv_data(db, source_dir)
-            if not results['riscv']['success']:
-                overall_success = False
     
     # Print summary
     if not args.quiet:
