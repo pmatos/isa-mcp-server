@@ -59,13 +59,12 @@ class ARMInstructionParser:
             with open(instructions_file, "r") as f:
                 data = json.load(f)
 
-            instructions = data.get("instructions", {})
-            for instruction_name, instruction_data in instructions.items():
+            # Handle the new array-based structure
+            instructions = data.get("instructions", [])
+            for instruction_obj in instructions:
                 try:
-                    records = self._parse_instruction(
-                        instruction_name, instruction_data
-                    )
-                    for record in records:
+                    # Recursively process instruction hierarchies
+                    for record in self._process_instruction_hierarchy(instruction_obj):
                         yield record
                 except Exception:
                     # Log error but continue processing
@@ -74,6 +73,31 @@ class ARMInstructionParser:
         except Exception:
             # Handle file reading errors
             return
+
+    def _process_instruction_hierarchy(self, obj: Dict) -> Iterator[InstructionRecord]:
+        """Recursively process instruction hierarchy to find actual instructions."""
+        if not isinstance(obj, dict):
+            return
+        
+        obj_type = obj.get("_type", "")
+        
+        if obj_type == "Instruction.Instruction":
+            # This is an actual instruction - parse it
+            name = obj.get("name", "UNKNOWN")
+            try:
+                records = self._parse_instruction(name, obj)
+                for record in records:
+                    yield record
+            except Exception:
+                # Continue processing other instructions
+                pass
+                
+        elif obj_type in ["Instruction.InstructionSet", "Instruction.InstructionGroup"]:
+            # This is a container - recurse into children
+            children = obj.get("children", [])
+            for child in children:
+                for record in self._process_instruction_hierarchy(child):
+                    yield record
 
     def _parse_instruction(
         self, name: str, instruction_data: Dict
@@ -107,25 +131,16 @@ class ARMInstructionParser:
         description = self._extract_description(instruction_data)
         category = self._extract_category(instruction_data)
 
-        # Get instruction instances (different encodings/variants)
-        instances = instruction_data.get("instances", {})
-        if not instances:
-            # Create a single instance if none exist
-            instance_data = {
-                "encodeset": instruction_data.get("encodeset", {}),
-                "operation": instruction_data.get("operation", {}),
-            }
-            instances = {"default": instance_data}
-
-        for instance_name, instance_data in instances.items():
-            try:
-                record = self._create_instruction_record(
-                    name, mnemonic, description, category, instance_name, instance_data
-                )
-                if record:
-                    records.append(record)
-            except Exception:
-                continue
+        # New structure: use the instruction data directly
+        # No more "instances" - the instruction itself is the instance
+        try:
+            record = self._create_instruction_record(
+                name, mnemonic, description, category, "default", instruction_data
+            )
+            if record:
+                records.append(record)
+        except Exception:
+            pass
 
         return records
 
@@ -183,28 +198,28 @@ class ARMInstructionParser:
 
     def _extract_mnemonic(self, name: str, instruction_data: Dict) -> Optional[str]:
         """Extract instruction mnemonic from name and data."""
-        # Try to extract from assembly rules or use the name
-        assembly_rules = instruction_data.get("assembly_rules", {})
-
-        # Look for the main assembly rule
-        for rule_name, rule_data in assembly_rules.items():
-            if rule_data.get("_type") == "Instruction.Rules.Rule":
-                symbols_data = rule_data.get("symbols")
-                if symbols_data and symbols_data.get("_type") == "Instruction.Assembly":
-                    symbols = symbols_data.get("symbols", [])
-                    if (
-                        symbols
-                        and symbols[0].get("_type") == "Instruction.Symbols.Literal"
-                    ):
-                        return symbols[0].get("value", "").upper()
+        # Try to extract from assembly field first
+        assembly = instruction_data.get("assembly", {})
+        if isinstance(assembly, dict) and assembly.get("_type") == "Instruction.Assembly":
+            symbols = assembly.get("symbols", [])
+            if symbols and isinstance(symbols[0], dict):
+                first_symbol = symbols[0]
+                if first_symbol.get("_type") == "Instruction.Symbols.Literal":
+                    return first_symbol.get("value", "").upper()
 
         # Fallback: extract from instruction name
-        mnemonic = re.sub(r"_\d+$", "", name)  # Remove trailing numbers
+        mnemonic = re.sub(r"_[A-Za-z0-9]+$", "", name)  # Remove suffix like _A1
         mnemonic = re.sub(r"[^A-Za-z0-9]", "", mnemonic)  # Remove special characters
         return mnemonic.upper() if mnemonic else None
 
     def _extract_description(self, instruction_data: Dict) -> str:
         """Extract instruction description."""
+        # Try to get title first (more descriptive)
+        title = instruction_data.get("title", "")
+        if title and isinstance(title, str):
+            return title.strip()
+            
+        # Try description object
         description_obj = instruction_data.get("description", {})
         if isinstance(description_obj, dict):
             # Try to extract text from description object
@@ -290,13 +305,17 @@ class ARMInstructionParser:
 
     def _parse_encoding(self, instance_data: Dict) -> Optional[EncodingRecord]:
         """Parse encoding information from instance data."""
-        encodeset = instance_data.get("encodeset", {})
+        encoding = instance_data.get("encoding", {})
 
-        if not encodeset:
+        if not encoding:
             return None
 
         # Extract basic encoding pattern
-        pattern = str(encodeset.get("pattern", ""))
+        pattern = str(encoding.get("pattern", ""))
+        if not pattern:
+            # Try to extract from name or other fields
+            name = instance_data.get("name", "")
+            pattern = name if name else "UNKNOWN"
 
         return EncodingRecord(
             pattern=pattern,
