@@ -203,6 +203,50 @@ Examples:
             logging.error(f"Failed to get instruction from database: {e}")
             return f"Error accessing instruction '{name}' for '{arch}': {e}"
 
+    @server.resource("isa://architectures/{arch}/instruction-groups")
+    async def get_instruction_groups(arch: str) -> str:
+        """Get instructions grouped by functional category for an architecture."""
+        import json
+
+        try:
+            # Check if architecture exists
+            supported_isas = server._db.get_supported_isas()
+            if arch not in supported_isas:
+                error_result = {"error": f"Architecture '{arch}' not found"}
+                return json.dumps(error_result)
+
+            # Get all instructions for this architecture
+            instructions = server._db.list_instructions(arch)
+
+            if not instructions:
+                result = {"groups": {}}
+                return json.dumps(result)
+
+            # Group instructions by category
+            groups = {}
+            for instruction in instructions:
+                category = instruction.category.lower()
+                if category not in groups:
+                    groups[category] = []
+
+                # Only add if not already present (for unique mnemonics)
+                if instruction.mnemonic not in groups[category]:
+                    groups[category].append(instruction.mnemonic)
+
+            # Sort instructions within each group
+            for category in groups:
+                groups[category].sort()
+
+            result = {"groups": groups}
+            return json.dumps(result)
+
+        except Exception as e:
+            logging.error(f"Failed to get instruction groups from database: {e}")
+            error_result = {
+                "error": f"Error accessing instruction groups for '{arch}': {e}"
+            }
+            return json.dumps(error_result)
+
     @server.tool("search_instructions")
     async def search_instructions(
         query: str, architecture: Optional[str] = None
