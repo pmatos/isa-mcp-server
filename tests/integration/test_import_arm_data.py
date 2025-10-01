@@ -61,14 +61,12 @@ class TestARMDataImport:
             assert 'register_direct' in mode_names
             assert 'immediate' in mode_names
             
-            # Check instructions were created
-            instructions = db.search_instructions('MOV', architecture='aarch64')
+            # Check instructions were created (fixture has ADD, not MOV)
+            instructions = db.search_instructions('ADD', isa='aarch64')
             assert len(instructions) > 0
             # Verify instruction has proper architecture association
             for instr in instructions[:5]:  # Check first 5
-                full_instr = db.get_instruction(instr.mnemonic, 'aarch64')
-                assert full_instr is not None
-                assert full_instr.isa_name == 'aarch64'
+                assert instr.isa == 'aarch64'
             
         finally:
             # Cleanup

@@ -41,33 +41,25 @@ def sample_arm_data_dir():
                 }
             },
             "_type": "Instruction.Instructions",
-            "instructions": {
-                "ADD_immediate": {
+            "instructions": [
+                {
                     "_type": "Instruction.Instruction",
+                    "name": "ADD_immediate",
                     "description": {"after": "Add immediate to register"},
-                    "assembly_rules": {
-                        "main": {
-                            "_type": "Instruction.Rules.Rule",
-                            "symbols": {
-                                "_type": "Instruction.Assembly",
-                                "symbols": [
-                                    {
-                                        "_type": "Instruction.Symbols.Literal",
-                                        "value": "ADD"
-                                    }
-                                ]
+                    "assembly": {
+                        "_type": "Instruction.Assembly",
+                        "symbols": [
+                            {
+                                "_type": "Instruction.Symbols.Literal",
+                                "value": "ADD"
                             }
-                        }
+                        ]
                     },
-                    "instances": {
-                        "default": {
-                            "encodeset": {
-                                "pattern": "sf:1 op:1 S:1 100010 shift:2 imm12:12 Rn:5 Rd:5"
-                            }
-                        }
+                    "encodeset": {
+                        "pattern": "sf:1 op:1 S:1 100010 shift:2 imm12:12 Rn:5 Rd:5"
                     }
                 }
-            }
+            ]
         }
         
         instructions_file = temp_path / "Instructions.json"
@@ -112,22 +104,42 @@ def sample_xed_data_dir():
         datafiles_dir.mkdir()
         
         # Create minimal xed-isa.txt
-        isa_content = """# Sample XED ISA file
-{ICLASS: MOV, CATEGORY: DATAXFER, EXTENSION: BASE, ISA_SET: I86, PATTERN: MOV_GPRv_MEMv}
-IFORM: MOV_GPRv_MEMv
-OPERANDS: REG0=GPRv_B():w MEM0:r
-PATTERN: MOD[mm] MOD!=3 REG[rrr] RM[nnn] MODRM()
-OPERANDS: REG0=GPRv_B():w MEM0:r:v
-PATTERN: 0x8b MOD[mm] MOD!=3 REG[rrr] RM[nnn] MODRM()
+        isa_content = """{
+ICLASS    : MOV
+CPL       : 3
+CATEGORY  : DATAXFER
+EXTENSION : BASE
+ISA_SET   : I86
+PATTERN   : 0x8B MOD[mm] MOD!=3 REG[rrr] RM[nnn] MODRM()
+OPERANDS  : REG0=GPRv():w MEM0:r:v
+}
 """
         
         isa_file = datafiles_dir / "xed-isa.txt"
         with open(isa_file, 'w') as f:
             f.write(isa_content)
         
+        # Create xed-regs.txt file
+        regs_file = datafiles_dir / "xed-regs.txt"
+        regs_content = """# Sample XED register file
+# Format: name class width maxval enc(hex) regid
+# 32-bit GPRs
+EAX gpr 32 0 0
+EBX gpr 32 0 1
+ECX gpr 32 0 2
+EDX gpr 32 0 3
+# 64-bit GPRs
+RAX gpr 64 0 0
+RBX gpr 64 0 1
+RCX gpr 64 0 2
+RDX gpr 64 0 3
+"""
+        with open(regs_file, 'w') as f:
+            f.write(regs_content)
+
         # Create VERSION file
         version_file = temp_path / "VERSION"
         with open(version_file, 'w') as f:
             f.write("2025.01.01\n")
-        
+
         yield temp_path
