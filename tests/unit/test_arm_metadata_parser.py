@@ -42,7 +42,7 @@ class TestARMMetadataParser:
     def test_parse_registers_default(self, sample_arm_data_dir):
         """Test default register parsing."""
         parser = ARMMetadataParser(sample_arm_data_dir)
-        aarch64_registers = parser.parse_registers()[0]
+        aarch64_registers = parser.parse_registers()
 
         # Should have general purpose registers
         register_names = [reg.register_name for reg in aarch64_registers]
@@ -70,7 +70,7 @@ class TestARMMetadataParser:
     def test_parse_addressing_modes(self, sample_arm_data_dir):
         """Test addressing mode parsing."""
         parser = ARMMetadataParser(sample_arm_data_dir)
-        aarch64_modes = parser.parse_addressing_modes()[0]
+        aarch64_modes = parser.parse_addressing_modes()
 
         mode_names = [mode.mode_name for mode in aarch64_modes]
 

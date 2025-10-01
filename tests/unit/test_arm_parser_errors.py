@@ -34,7 +34,7 @@ class TestARMMetadataParserErrorHandling:
         parser = ARMMetadataParser(tmp_path)
 
         # Should handle JSON parse errors gracefully by returning defaults
-        registers = parser.parse_registers()[0]
+        registers = parser.parse_registers()
         # Should fall back to default registers
         assert isinstance(registers, list)
         assert len(registers) > 0
@@ -71,7 +71,7 @@ class TestARMMetadataParserErrorHandling:
         empty_file.write_text("{}")
 
         parser = ARMMetadataParser(tmp_path)
-        registers = parser.parse_registers()[0]
+        registers = parser.parse_registers()
 
         # Should return default registers even with empty file
         assert isinstance(registers, list)
