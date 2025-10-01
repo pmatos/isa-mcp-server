@@ -8,6 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -15,6 +17,7 @@ from isa_mcp_server.isa_database import ISADatabase
 from isa_mcp_server.importers.xed_importer import XEDImporter
 
 
+@pytest.mark.asyncio
 async def test_xed_parser():
     """Test XED parser with a small sample."""
     print("Testing XED parser...")
@@ -71,6 +74,7 @@ IFORM     : ADD_MEMb_GPR8_00
             Path(f.name).unlink()
 
 
+@pytest.mark.asyncio
 async def test_database():
     """Test database operations."""
     print("\nTesting database operations...")
@@ -116,6 +120,7 @@ async def test_database():
         Path(db_path).unlink()
 
 
+@pytest.mark.asyncio
 async def test_full_import():
     """Test full import process with XED data."""
     print("\nTesting full import process...")

@@ -410,12 +410,23 @@ class ISADatabase:
     ) -> List[InstructionRecord]:
         """Search instructions using full-text search."""
         with self.get_connection() as conn:
+            # Handle empty query by listing all instructions for the ISA
+            if not query or query.strip() == "":
+                if isa:
+                    # Get all instructions for the specified ISA
+                    query_sql = "SELECT * FROM instructions WHERE isa = ? ORDER BY mnemonic LIMIT ?"
+                    cursor = conn.execute(query_sql, (isa, limit))
+                    return [self._row_to_instruction(row) for row in cursor.fetchall()]
+                else:
+                    # Return empty list for empty global search
+                    return []
+
             if isa:
                 cursor = conn.execute(
                     """
                     SELECT instructions.* FROM instruction_search
                     JOIN instructions ON instruction_search.rowid = instructions.id
-                    WHERE instruction_search MATCH ? AND isa = ?
+                    WHERE instruction_search MATCH ? AND instructions.isa = ?
                     ORDER BY rank
                     LIMIT ?
                 """,

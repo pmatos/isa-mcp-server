@@ -94,7 +94,7 @@ EBX gpr 32 0 1
         reg_file.write_text("""# Test width validation
 # Valid registers
 EAX gpr 32 0 0
-EBX gpr 16 0 1
+EBX gpr 32 0 1
 # Invalid widths - should be skipped
 ZERO_WIDTH gpr 0 0 2
 NEGATIVE_WIDTH gpr -8 0 3
