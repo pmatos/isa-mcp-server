@@ -193,13 +193,12 @@ class TestValidateDbPath:
 
     def test_absolute_path_outside_cwd_rejected(self):
         """Test that absolute paths outside CWD are rejected."""
-        # Try to access a path outside current working directory
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            external_path = Path(tmp_dir) / "external.db"
+        # Use a path that's outside CWD and not in safe/system directories
+        external_path = "/data/external.db"
 
-            with pytest.raises(DatabasePathError) as exc_info:
-                validate_db_path(str(external_path))
-            assert "outside the project directory" in str(exc_info.value)
+        with pytest.raises(DatabasePathError) as exc_info:
+            validate_db_path(external_path)
+        assert "outside the project directory" in str(exc_info.value)
 
     def test_home_directory_allowed(self):
         """Test that paths in user's home directory are allowed."""
@@ -213,7 +212,7 @@ class TestValidateDbPath:
             try:
                 validate_db_path(str(test_path))
             except (DatabasePermissionError, DatabaseIntegrityError):
-                # These are acceptable - we're testing path validation, not file operations
+                # These are acceptable - testing path validation only
                 pass
         except RuntimeError:
             # Skip test if home directory is not accessible

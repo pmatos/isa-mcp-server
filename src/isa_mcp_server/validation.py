@@ -115,6 +115,10 @@ def _is_system_path(path: Path) -> bool:
     """Check if path is in a system directory that should be protected."""
     path_str = str(path).lower()
 
+    # Check for Windows path patterns (even on non-Windows systems)
+    if ":" in path_str and ("windows" in path_str or "program files" in path_str):
+        return True
+
     # Common system directories to protect
     system_dirs = [
         "/etc",
@@ -122,7 +126,6 @@ def _is_system_path(path: Path) -> bool:
         "/bin",
         "/sbin",
         "/var",
-        "/tmp",
         "/dev",
         "/proc",
         "/sys",
@@ -136,7 +139,7 @@ def _is_system_path(path: Path) -> bool:
         "/root",
     ]
 
-    # Windows system directories
+    # Windows system directories (for Windows systems)
     windows_dirs = [
         "c:\\windows",
         "c:\\program files",
@@ -165,6 +168,7 @@ def _is_safe_absolute_path(path: Path) -> bool:
 
     # Allow common data directories
     safe_dirs = [
+        "/tmp",
         "/var/lib",
         "/usr/local/share",
         "/opt/local/share",
