@@ -24,6 +24,13 @@ target-version = "py313"
 select = ["E", "F", "I", "W"]
 ignore = []
 
+[tool.ruff.lint.per-file-ignores]
+"tests/unit/test_architectures_resource.py" = ["E501"]
+"tests/unit/test_instruction_groups_resource.py" = ["E501"]
+"tests/unit/test_arm_instruction_parser.py" = ["E501"]
+"tests/unit/test_arm_parser_errors.py" = ["E501"]
+"tests/integration/test_cross_isa_imports.py" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

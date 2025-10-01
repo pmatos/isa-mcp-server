@@ -414,7 +414,10 @@ class ISADatabase:
             if not query or query.strip() == "":
                 if isa:
                     # Get all instructions for the specified ISA
-                    query_sql = "SELECT * FROM instructions WHERE isa = ? ORDER BY mnemonic LIMIT ?"
+                    query_sql = (
+                        "SELECT * FROM instructions WHERE isa = ? "
+                        "ORDER BY mnemonic LIMIT ?"
+                    )
                     cursor = conn.execute(query_sql, (isa, limit))
                     return [self._row_to_instruction(row) for row in cursor.fetchall()]
                 else:

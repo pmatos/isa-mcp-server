@@ -2,10 +2,6 @@
 
 import json
 import os
-import tempfile
-from pathlib import Path
-
-import pytest
 
 from src.isa_mcp_server.arm_metadata_parser import ARMMetadataParser
 from src.isa_mcp_server.importers.arm_instruction_parser import ARMInstructionParser
@@ -50,19 +46,15 @@ class TestARMMetadataParserErrorHandling:
             "registers": [
                 {"name": "X0"},  # Missing other required fields
                 {"type": "general"},  # Missing name
-                {
-                    "name": "X1",
-                    "type": "general", 
-                    "width": 64
-                }  # Complete entry
+                {"name": "X1", "type": "general", "width": 64},  # Complete entry
             ]
         }
-        
+
         json_file = tmp_path / "registers.json"
         json_file.write_text(json.dumps(incomplete_data))
-        
+
         parser = ARMMetadataParser(tmp_path)
-        
+
         # Should skip incomplete entries and process valid ones
         try:
             registers, modes = parser.parse_registers()
@@ -95,7 +87,9 @@ class TestARMInstructionParserErrorHandling:
         parser = ARMInstructionParser()
 
         # Should handle missing files gracefully
-        instructions = list(parser.parse_instructions_file(tmp_path / "Instructions.json"))
+        instructions = list(
+            parser.parse_instructions_file(tmp_path / "Instructions.json")
+        )
         assert instructions == []
 
     def test_corrupted_instruction_json(self, tmp_path):
@@ -119,7 +113,7 @@ class TestARMInstructionParserErrorHandling:
                     # Wrong structure - should be dict not array
                     "mnemonic": "ADD",
                     "description": "Add operation",
-                    "syntax": "ADD Rd, Rn, Rm"
+                    "syntax": "ADD Rd, Rn, Rm",
                 }
             ]
         }
@@ -145,18 +139,18 @@ class TestARMInstructionParserErrorHandling:
                     "syntax": "TEST Rd, Rm",
                     "encoding": {
                         "pattern": None,  # Invalid pattern
-                        "bits": "invalid_bits"
-                    }
+                        "bits": "invalid_bits",
+                    },
                 }
             ]
         }
-        
+
         json_file = tmp_path / "Instructions.json"
         json_file.write_text(json.dumps(data_with_bad_encoding))
 
         parser = ARMInstructionParser()
         instructions = list(parser.parse_instructions_file(json_file))
-        
+
         # Should handle invalid encodings gracefully
         assert isinstance(instructions, list)
 
@@ -180,28 +174,27 @@ class TestARMInstructionParserErrorHandling:
     def test_large_file_handling(self, tmp_path):
         """Test handling very large instruction files."""
         # Create a large instruction file with proper ARM array structure
-        large_data = {
-            "_type": "Instruction.Instructions",
-            "instructions": []
-        }
+        large_data = {"_type": "Instruction.Instructions", "instructions": []}
 
         # Add many instructions in proper ARM format (as array)
         for i in range(50):  # Reduced for faster testing
-            large_data["instructions"].append({
-                "_type": "Instruction.Instruction",
-                "name": f"TEST{i}",
-                "description": {"after": f"Test instruction {i}"},
-                "assembly": {
-                    "_type": "Instruction.Assembly",
-                    "symbols": [
-                        {
-                            "_type": "Instruction.Symbols.Literal",
-                            "value": f"TEST{i}"
-                        }
-                    ]
-                },
-                "encodeset": {"pattern": "10101010:8"}
-            })
+            large_data["instructions"].append(
+                {
+                    "_type": "Instruction.Instruction",
+                    "name": f"TEST{i}",
+                    "description": {"after": f"Test instruction {i}"},
+                    "assembly": {
+                        "_type": "Instruction.Assembly",
+                        "symbols": [
+                            {
+                                "_type": "Instruction.Symbols.Literal",
+                                "value": f"TEST{i}",
+                            }
+                        ],
+                    },
+                    "encodeset": {"pattern": "10101010:8"},
+                }
+            )
 
         json_file = tmp_path / "Instructions.json"
         json_file.write_text(json.dumps(large_data))
@@ -221,22 +214,22 @@ class TestARMInstructionParserErrorHandling:
                 {
                     "mnemonic": "TËST",  # Unicode characters
                     "description": "Test with unicode: ñáéíóú",
-                    "syntax": "TËST Rd, Rm"
+                    "syntax": "TËST Rd, Rm",
                 },
                 {
                     "mnemonic": "TEST<>",  # Special characters
                     "description": "Test with symbols: <>{}[]",
-                    "syntax": "TEST<> Rd, Rm"
-                }
+                    "syntax": "TEST<> Rd, Rm",
+                },
             ]
         }
-        
+
         json_file = tmp_path / "Instructions.json"
         json_file.write_text(json.dumps(data_with_unicode, ensure_ascii=False))
 
         parser = ARMInstructionParser()
         instructions = list(parser.parse_instructions_file(json_file))
-        
+
         # Should handle unicode characters properly
         assert isinstance(instructions, list)
         if instructions:
