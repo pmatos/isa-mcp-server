@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import AsyncGenerator, AsyncIterator, Iterator, List, Optional
 
 from ..isa_database import (
     EncodingRecord,
@@ -42,7 +42,7 @@ class XEDImporter(ISAImporter):
                 pass
         return None
 
-    async def parse_sources(self, source_dir: Path) -> Iterator[InstructionRecord]:
+    async def parse_sources(self, source_dir: Path) -> AsyncGenerator[InstructionRecord, None]:
         """Parse XED source files and yield instruction records."""
         datafiles_dir = source_dir / "datafiles"
         if not datafiles_dir.exists():
@@ -100,7 +100,7 @@ class XEDImporter(ISAImporter):
                     async for instruction in self._process_file(isa_file):
                         yield instruction
 
-    async def _process_file(self, file_path: Path) -> Iterator[InstructionRecord]:
+    async def _process_file(self, file_path: Path) -> AsyncGenerator[InstructionRecord, None]:
         """Process a single XED instruction file."""
         try:
             for xed_instruction in self.parser.parse_file(file_path):
@@ -362,15 +362,15 @@ class XEDImporter(ISAImporter):
         )
 
         # Check for displacement
-        displacement = "DISP(" in pattern_str
+        displacement_bool = "DISP(" in pattern_str
 
         return EncodingRecord(
             pattern=pattern_str,
             opcode=opcode,
             modrm=modrm,
             sib=sib,
-            displacement=displacement,
-            immediate=immediate,
+            displacement="yes" if displacement_bool else None,
+            immediate="yes" if immediate else None,
         )
 
     def _parse_flags(self, flags_str: str) -> List[str]:

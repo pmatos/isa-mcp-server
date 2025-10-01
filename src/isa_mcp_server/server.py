@@ -257,7 +257,7 @@ def create_mcp_server(db_path: str = "isa_docs.db") -> FastMCP:
         raise RuntimeError(f"Cannot start server without database at {db_path}")
 
     # Store database reference for use in handlers
-    server._db = db
+    server._db = db  # type: ignore[attr-defined]
 
     # Register resources and tools
     _register_handlers(server)
@@ -273,7 +273,7 @@ def _register_handlers(server: FastMCP):
         """List all supported instruction set architectures."""
 
         try:
-            architectures = server._db.get_supported_isas()
+            architectures = server._db.get_supported_isas()  # type: ignore[attr-defined]
             if architectures:
                 result = {"architectures": sorted(architectures)}
                 return json.dumps(result)
@@ -290,21 +290,21 @@ def _register_handlers(server: FastMCP):
         """Get detailed information about a specific architecture."""
         try:
             # Check if architecture exists in database
-            supported_isas = server._db.get_supported_isas()
+            supported_isas = server._db.get_supported_isas()  # type: ignore[attr-defined]
             if name not in supported_isas:
                 return f"Architecture '{name}' not found in database"
 
             # Get instruction count for this architecture
-            instruction_count = server._db.get_instruction_count(name)
+            instruction_count = server._db.get_instruction_count(name)  # type: ignore[attr-defined]
 
             # Get architecture metadata from database
-            architecture = server._db.get_architecture(name)
+            architecture = server._db.get_architecture(name)  # type: ignore[attr-defined]
             if not architecture:
                 return f"Architecture '{name}' metadata not found in database"
 
             # Get registers and addressing modes
-            registers = server._db.get_architecture_registers(name)
-            addressing_modes = server._db.get_architecture_addressing_modes(name)
+            registers = server._db.get_architecture_registers(name)  # type: ignore[attr-defined]
+            addressing_modes = server._db.get_architecture_addressing_modes(name)  # type: ignore[attr-defined]
 
             # Format register information
             main_gprs = [
@@ -313,7 +313,7 @@ def _register_handlers(server: FastMCP):
             main_gpr_names = [r.register_name for r in main_gprs]
 
             # Get other register classes
-            other_regs = {}
+            other_regs: dict[str, list[str]] = {}
             for reg in registers:
                 if reg.register_class not in other_regs:
                     other_regs[reg.register_class] = []
@@ -368,7 +368,7 @@ Machine Mode: {architecture.machine_mode}
     async def list_instructions(arch: str) -> str:
         """List instructions for a specific architecture."""
         try:
-            instructions = server._db.list_instructions(arch, limit=100)
+            instructions = server._db.list_instructions(arch, limit=100)  # type: ignore[attr-defined]
 
             if instructions:
                 # Get unique mnemonics
@@ -385,7 +385,7 @@ Machine Mode: {architecture.machine_mode}
     async def get_instruction_info(arch: str, name: str) -> str:
         """Get detailed information about a specific instruction."""
         try:
-            instruction = server._db.get_instruction(arch, name.upper())
+            instruction = server._db.get_instruction(arch, name.upper())  # type: ignore[attr-defined]
 
             if instruction:
                 # Convert operands to string list
@@ -421,20 +421,20 @@ Examples:
 
         try:
             # Check if architecture exists
-            supported_isas = server._db.get_supported_isas()
+            supported_isas = server._db.get_supported_isas()  # type: ignore[attr-defined]
             if arch not in supported_isas:
                 error_result = {"error": f"Architecture '{arch}' not found"}
                 return json.dumps(error_result)
 
             # Get all instructions for this architecture
-            instructions = server._db.list_instructions(arch)
+            instructions = server._db.list_instructions(arch)  # type: ignore[attr-defined]
 
             if not instructions:
-                result = {"groups": {}}
+                result: dict[str, dict[str, list[str]]] = {"groups": {}}
                 return json.dumps(result)
 
             # Group instructions by category
-            groups = {}
+            groups: dict[str, list[str]] = {}
             for instruction in instructions:
                 category = instruction.category.lower()
                 if category not in groups:
@@ -464,16 +464,16 @@ Examples:
 
         try:
             # Check if architecture exists
-            supported_isas = server._db.get_supported_isas()
+            supported_isas = server._db.get_supported_isas()  # type: ignore[attr-defined]
             if arch not in supported_isas:
                 error_result = {"error": f"Architecture '{arch}' not found"}
                 return json.dumps(error_result)
 
             # Get all registers with alias information for this architecture
-            registers = server._db.get_architecture_registers_with_aliases(arch)
+            registers = server._db.get_architecture_registers_with_aliases(arch)  # type: ignore[attr-defined]
 
             if not registers:
-                result = {"registers": []}
+                result: dict[str, list[dict[str, str]]] = {"registers": []}
                 return json.dumps(result)
 
             # Build register definitions with ISA-agnostic information
@@ -555,7 +555,7 @@ Examples:
     ) -> str:
         """Search for instructions by name or description."""
         try:
-            instructions = server._db.search_instructions(query, architecture)
+            instructions = server._db.search_instructions(query, architecture)  # type: ignore[attr-defined]
 
             if instructions:
                 results = []

@@ -121,7 +121,7 @@ class ARMInstructionParser:
         self, name: str, instruction_data: Dict
     ) -> List[InstructionRecord]:
         """Parse a base instruction definition."""
-        records = []
+        records: List[InstructionRecord] = []
 
         # Extract basic information
         mnemonic = self._extract_mnemonic(name, instruction_data)
@@ -295,7 +295,7 @@ class ARMInstructionParser:
 
     def _parse_operands(self, instance_data: Dict) -> List[OperandRecord]:
         """Parse operands from instance data."""
-        operands = []
+        operands: List[OperandRecord] = []
 
         # This is a simplified operand parsing - the ARM data structure is very complex
         # For now, create basic operand structure
@@ -325,8 +325,8 @@ class ARMInstructionParser:
             opcode=None,  # Would need detailed parsing
             modrm=False,  # ARM doesn't use ModR/M
             sib=False,  # ARM doesn't use SIB
-            displacement=False,
-            immediate=False,
+            displacement=None,
+            immediate=None,
         )
 
     def _extract_features(self, instance_data: Dict) -> List[str]:

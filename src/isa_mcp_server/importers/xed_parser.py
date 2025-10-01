@@ -16,7 +16,7 @@ class XEDInstruction:
     category: str = ""
     extension: str = ""
     isa_set: str = ""
-    attributes: List[str] = None
+    attributes: Optional[List[str]] = None
     pattern: str = ""
     operands: str = ""
     iform: Optional[str] = None
