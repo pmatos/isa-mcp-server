@@ -20,6 +20,6 @@
   },
   "homepage": "https://github.com/pmatos/isa-mcp-server#readme",
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.16.1"
+    "@modelcontextprotocol/inspector": "^0.16.6"
   }
 }
