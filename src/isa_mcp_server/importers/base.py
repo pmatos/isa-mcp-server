@@ -4,7 +4,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, Iterator, Optional
 
 from ..isa_database import InstructionRecord, ISADatabase
 
@@ -35,9 +35,9 @@ class ISAImporter(ABC):
         pass
 
     @abstractmethod
-    async def parse_sources(self, source_dir: Path) -> Iterator[InstructionRecord]:
+    def parse_sources(self, source_dir: Path) -> AsyncGenerator[InstructionRecord, None]:
         """Parse source files and yield instruction records."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_source_version(self, source_dir: Path) -> Optional[str]:

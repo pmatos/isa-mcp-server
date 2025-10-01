@@ -5,7 +5,7 @@ import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 @dataclass
@@ -47,14 +47,14 @@ class InstructionRecord:
     syntax: str = ""
 
     # Serialized as JSON in database
-    operands: List[OperandRecord] = None
+    operands: Optional[List[OperandRecord]] = None
     encoding: Optional[EncodingRecord] = None
-    flags_affected: List[str] = None
-    cpuid_features: List[str] = None
+    flags_affected: Optional[List[str]] = None
+    cpuid_features: Optional[List[str]] = None
 
     # Metadata
     cpl: Optional[int] = None  # privilege level
-    attributes: List[str] = None
+    attributes: Optional[List[str]] = None
     added_version: Optional[str] = None
     deprecated: bool = False
 
@@ -354,7 +354,7 @@ class ISADatabase:
                     instruction.isa_set,
                     instruction.description,
                     instruction.syntax,
-                    json.dumps([asdict(op) for op in instruction.operands]),
+                    json.dumps([asdict(op) for op in instruction.operands] if instruction.operands else []),
                     json.dumps(
                         asdict(instruction.encoding) if instruction.encoding else None
                     ),
@@ -396,7 +396,7 @@ class ISADatabase:
         """List all instructions for an ISA."""
         with self.get_connection() as conn:
             query = "SELECT * FROM instructions WHERE isa = ? ORDER BY mnemonic"
-            params = [isa]
+            params: List[Any] = [isa]
 
             if limit:
                 query += " LIMIT ?"

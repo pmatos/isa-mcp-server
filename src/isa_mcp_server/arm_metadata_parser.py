@@ -49,7 +49,7 @@ class ARMMetadataParser:
 
         return architectures
 
-    def parse_registers(self) -> Tuple[List[RegisterRecord]]:
+    def parse_registers(self) -> List[RegisterRecord]:
         """Parse registers from Registers.json for AArch64."""
         aarch64_registers = []
 
@@ -72,7 +72,7 @@ class ARMMetadataParser:
             # Fall back to predefined registers
             aarch64_registers = self._get_default_aarch64_registers()
 
-        return (aarch64_registers,)
+        return aarch64_registers
 
     def _get_default_aarch64_registers(self) -> List[RegisterRecord]:
         """Get default AArch64 register definitions."""
@@ -228,7 +228,7 @@ class ARMMetadataParser:
 
         return registers
 
-    def parse_addressing_modes(self) -> Tuple[List[AddressingModeRecord]]:
+    def parse_addressing_modes(self) -> List[AddressingModeRecord]:
         """Parse addressing modes for AArch64."""
         # AArch64 addressing modes
         aarch64_modes = [
@@ -294,7 +294,7 @@ class ARMMetadataParser:
             ),
         ]
 
-        return (aarch64_modes,)
+        return aarch64_modes
 
     def get_cpu_features(self) -> Dict[str, List[str]]:
         """Parse CPU features from Features.json."""

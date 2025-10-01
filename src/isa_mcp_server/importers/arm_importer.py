@@ -1,7 +1,7 @@
 """ARM importer for AArch64 instruction data."""
 
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import AsyncGenerator, AsyncIterator, Iterator, Optional
 
 from ..arm_metadata_parser import ARMMetadataParser
 from ..isa_database import InstructionRecord
@@ -34,7 +34,7 @@ class ARMImporter(ISAImporter):
         except Exception:
             return None
 
-    async def parse_sources(self, source_dir: Path) -> Iterator[InstructionRecord]:
+    async def parse_sources(self, source_dir: Path) -> AsyncGenerator[InstructionRecord, None]:
         """Parse ARM source files and yield instruction records."""
         instructions_file = source_dir / "Instructions.json"
         if not instructions_file.exists():
@@ -50,7 +50,7 @@ class ARMImporter(ISAImporter):
 
     async def _process_instructions_file(
         self, file_path: Path
-    ) -> Iterator[InstructionRecord]:
+    ) -> AsyncGenerator[InstructionRecord, None]:
         """Process the ARM Instructions.json file."""
         try:
             for instruction_record in self.parser.parse_instructions_file(file_path):
@@ -73,10 +73,10 @@ class ARMImporter(ISAImporter):
             architectures = parser.parse_architectures()
 
             # Parse registers
-            (aarch64_registers,) = parser.parse_registers()
+            aarch64_registers = parser.parse_registers()
 
             # Parse addressing modes
-            (aarch64_modes,) = parser.parse_addressing_modes()
+            aarch64_modes = parser.parse_addressing_modes()
 
             # Insert architectures
             arch_ids = {}
