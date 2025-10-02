@@ -37,7 +37,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
           claude_args: >-
-            --model claude-sonnet-4.5
+            --model claude-sonnet-4-5
             --allowedTools "Bash(npm run:*),Bash(gh:*),Bash(uv run:*),Bash(sqlite3:*),Bash(find:*),Bash(gh pr create:*),Bash(gh issue create:*)"
 
           # Optional: Customize the trigger phrase (default: @claude)
