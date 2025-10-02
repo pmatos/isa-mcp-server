@@ -654,7 +654,7 @@ Examples:
             if instructions:
                 mnemonics = list(set(instr.mnemonic for instr in instructions))
                 mnemonics.sort()
-                data = [f"{instr}" for instr in mnemonics]
+                data = mnemonics
             else:
                 data = []
 
