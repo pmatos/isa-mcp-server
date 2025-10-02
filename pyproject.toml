@@ -19,6 +19,7 @@ dev = [
 [tool.ruff]
 line-length = 88
 target-version = "py313"
+exclude = ["External/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]

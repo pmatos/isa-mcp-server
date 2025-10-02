@@ -56,7 +56,8 @@ async def import_intel_data(
         elif skip_metadata:
             metadata_msg = " (metadata skipped)"
         logging.info(
-            f"Intel import successful: {instr_count} instructions imported{metadata_msg}"
+            f"Intel import successful: {instr_count} instructions "
+            f"imported{metadata_msg}"
         )
     else:
         logging.error(f"Intel import failed: {result['error']}")
@@ -96,8 +97,8 @@ async def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --all                                    # Import all available ISAs with metadata
-  %(prog)s --intel --source-dir External/xed       # Import Intel x86_32/x86_64 from XED
+  %(prog)s --all                                    # Import all ISAs
+  %(prog)s --intel --source-dir External/xed       # Import Intel x86
   %(prog)s --intel --skip-metadata                 # Import Intel instructions only
   %(prog)s --arm --source-dir /path/to/arm         # Import ARM AArch64
   %(prog)s --intel --db-path custom.db             # Use custom database path
