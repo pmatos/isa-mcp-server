@@ -52,7 +52,8 @@ jobs:
             Be constructive and helpful in your feedback.
 
           track_progress: true
-
+          use_sticky_comment: true
+          
           claude_args: >-
             --model claude-sonnet-4-5
             --allowedTools "Bash(npm run:*),Bash(gh:*),Bash(uv run:*),Bash(sqlite3:*),Bash(find:*)"
