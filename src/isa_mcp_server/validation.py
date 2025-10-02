@@ -45,9 +45,17 @@ def validate_db_path(db_path: Union[str, Path]) -> Path:
         DatabasePermissionError: If file permissions are insufficient
         DatabaseIntegrityError: If database format is invalid
     """
-    path = Path(db_path).resolve()
+    # Check original path before resolving (to catch Windows paths on non-Windows)
+    original_path = Path(db_path)
+    if _is_system_path(original_path):
+        raise DatabasePathError(
+            f"Database path '{original_path}' is not allowed. "
+            "Please use a path in the project directory or a safe location."
+        )
 
-    # Security check: Ensure path is not trying to access system directories
+    path = original_path.resolve()
+
+    # Double-check resolved path as well
     if _is_system_path(path):
         raise DatabasePathError(
             f"Database path '{path}' is not allowed. "
@@ -113,10 +121,13 @@ def validate_db_path(db_path: Union[str, Path]) -> Path:
 
 def _is_system_path(path: Path) -> bool:
     """Check if path is in a system directory that should be protected."""
-    path_str = str(path).lower()
+    path_str = os.path.normcase(str(path))
+    path_str_lower = path_str.lower()
 
     # Check for Windows path patterns (even on non-Windows systems)
-    if ":" in path_str and ("windows" in path_str or "program files" in path_str):
+    if ":" in path_str and (
+        "windows" in path_str_lower or "program files" in path_str_lower
+    ):
         return True
 
     # Common system directories to protect
@@ -151,32 +162,47 @@ def _is_system_path(path: Path) -> bool:
 
     all_system_dirs = system_dirs + windows_dirs
 
-    return any(path_str.startswith(sys_dir) for sys_dir in all_system_dirs)
+    return any(
+        path_str.startswith(os.path.normcase(sys_dir)) for sys_dir in all_system_dirs
+    )
 
 
 def _is_safe_absolute_path(path: Path) -> bool:
     """Check if absolute path is in a safe location."""
-    path_str = str(path).lower()
-
-    # Allow paths in user's home directory
     try:
-        home = Path.home()
-        path.relative_to(home)
-        return True
-    except (ValueError, RuntimeError):
-        pass
+        # Resolve the path to its canonical form
+        resolved_path = path.resolve()
 
-    # Allow common data directories
-    safe_dirs = [
-        "/tmp",
-        "/var/lib",
-        "/usr/local/share",
-        "/opt/local/share",
-        "c:\\programdata",
-        "c:\\users\\public\\documents",
-    ]
+        # Allow paths in user's home directory
+        try:
+            home = Path.home().resolve()
+            if resolved_path.is_relative_to(home):
+                return True
+        except (ValueError, RuntimeError):
+            pass
 
-    return any(path_str.startswith(safe_dir) for safe_dir in safe_dirs)
+        # Allow common data directories
+        safe_dirs = [
+            Path("/tmp"),
+            Path("/var/lib"),
+            Path("/usr/local/share"),
+            Path("/opt/local/share"),
+            Path("c:\\programdata"),
+            Path("c:\\users\\public\\documents"),
+        ]
+
+        # Resolve safe directories and check if path is relative to any of them
+        for safe_dir in safe_dirs:
+            try:
+                resolved_safe_dir = safe_dir.resolve()
+                if resolved_path.is_relative_to(resolved_safe_dir):
+                    return True
+            except (ValueError, RuntimeError, OSError):
+                continue
+
+        return False
+    except (ValueError, RuntimeError, OSError):
+        return False
 
 
 def _validate_database_integrity(db_path: Path) -> None:

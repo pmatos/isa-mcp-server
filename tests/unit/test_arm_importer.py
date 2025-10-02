@@ -73,16 +73,17 @@ class TestARMImporter:
 
     @pytest.mark.asyncio
     async def test_populate_architecture_metadata_error(self, temp_db, tmp_path):
-        """Test architecture metadata population with invalid data."""
+        """Test architecture metadata population with database error."""
         importer = ARMImporter(temp_db)
 
-        # Create a path that will cause an error
-        bad_path = tmp_path / "nonexistent"
-
-        with patch.object(importer.logger, "error") as mock_error:
-            success = await importer.populate_architecture_metadata(bad_path)
-            assert not success
-            mock_error.assert_called()
+        # Mock the database insert to raise an exception
+        with patch.object(
+            temp_db, "insert_architecture", side_effect=Exception("DB error")
+        ):
+            with patch.object(importer.logger, "error") as mock_error:
+                success = await importer.populate_architecture_metadata(tmp_path)
+                assert not success
+                mock_error.assert_called()
 
     @pytest.mark.asyncio
     async def test_import_from_source_success(self, temp_db, sample_arm_data_dir):

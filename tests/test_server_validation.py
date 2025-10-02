@@ -1,5 +1,6 @@
 """Tests for server database validation integration."""
 
+import os
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -72,8 +73,6 @@ class TestServerValidation:
                 conn.commit()
 
             # Make file read-only
-            import os
-
             os.chmod(db_path, 0o444)
 
             try:
