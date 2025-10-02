@@ -54,7 +54,7 @@ jobs:
           track_progress: true
 
           claude_args: >-
-            --model claude-sonnet-4.5
+            --model claude-sonnet-4-5
             --allowedTools "Bash(npm run:*),Bash(gh:*),Bash(uv run:*),Bash(sqlite3:*),Bash(find:*)"
 
           # Optional: Customize review based on file types
