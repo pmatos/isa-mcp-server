@@ -1,7 +1,7 @@
 """RISC-V importer for instruction data (future implementation)."""
 
 from pathlib import Path
-from typing import AsyncGenerator, AsyncIterator, Iterator, Optional
+from typing import AsyncGenerator, Optional
 
 from ..isa_database import InstructionRecord
 from .base import ISAImporter
@@ -27,7 +27,9 @@ class RISCVImporter(ISAImporter):
         # TODO: Implement version detection for RISC-V specification
         return None
 
-    async def parse_sources(self, source_dir: Path) -> AsyncGenerator[InstructionRecord, None]:
+    async def parse_sources(
+        self, source_dir: Path
+    ) -> AsyncGenerator[InstructionRecord, None]:
         """Parse RISC-V source files and yield instruction records."""
         # TODO: Implement RISC-V instruction parser
         # This will need to handle RISC-V specification formats

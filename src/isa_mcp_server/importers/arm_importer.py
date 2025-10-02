@@ -1,7 +1,7 @@
 """ARM importer for AArch64 instruction data."""
 
 from pathlib import Path
-from typing import AsyncGenerator, AsyncIterator, Iterator, Optional
+from typing import AsyncGenerator, Optional
 
 from ..arm_metadata_parser import ARMMetadataParser
 from ..isa_database import InstructionRecord
@@ -34,7 +34,9 @@ class ARMImporter(ISAImporter):
         except Exception:
             return None
 
-    async def parse_sources(self, source_dir: Path) -> AsyncGenerator[InstructionRecord, None]:
+    async def parse_sources(
+        self, source_dir: Path
+    ) -> AsyncGenerator[InstructionRecord, None]:
         """Parse ARM source files and yield instruction records."""
         instructions_file = source_dir / "Instructions.json"
         if not instructions_file.exists():
