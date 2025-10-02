@@ -2,11 +2,13 @@
 """
 Architecture Metadata Population Script
 
-This script populates the database with architecture metadata extracted from XED datafiles.
-It should be run after the initial instruction import to add architecture specifications.
+This script populates the database with architecture metadata extracted
+from XED datafiles. It should be run after the initial instruction import
+to add architecture specifications.
 
 Usage:
-    python populate_architecture_metadata.py [--db-path isa_docs.db] [--xed-dir External/xed]
+    python populate_architecture_metadata.py [--db-path isa_docs.db]
+        [--xed-dir External/xed]
 """
 
 import argparse
@@ -106,7 +108,8 @@ def populate_architecture_metadata(db: ISADatabase, xed_dir: Path) -> bool:
             modes = db.get_architecture_addressing_modes(isa_name)
 
             logging.info(
-                f"Architecture {isa_name}: {len(registers)} registers, {len(modes)} addressing modes"
+                f"Architecture {isa_name}: {len(registers)} registers, "
+                f"{len(modes)} addressing modes"
             )
 
         logging.info("Architecture metadata population completed successfully!")
