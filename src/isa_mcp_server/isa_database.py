@@ -405,23 +405,26 @@ class ISADatabase:
         """List all instructions for an ISA with pagination support."""
         with self.get_connection() as conn:
             # Validate order_by to prevent SQL injection
-            valid_columns = [
-                "mnemonic",
-                "category",
-                "extension",
-                "isa_set",
-                "description",
-            ]
-            if order_by not in valid_columns:
-                order_by = "mnemonic"
+            valid_order_by = {
+                "mnemonic": "mnemonic",
+                "category": "category",
+                "extension": "extension",
+                "isa_set": "isa_set",
+                "description": "description",
+            }
+            valid_order_direction = {
+                "ASC": "ASC",
+                "DESC": "DESC",
+            }
 
-            # Validate order_direction
-            if order_direction.upper() not in ["ASC", "DESC"]:
-                order_direction = "ASC"
+            order_by_clause = valid_order_by.get(order_by, "mnemonic")
+            order_direction_clause = valid_order_direction.get(
+                order_direction.upper(), "ASC"
+            )
 
             query = (
                 f"SELECT * FROM instructions WHERE isa = ? "
-                f"ORDER BY {order_by} {order_direction}"
+                f"ORDER BY {order_by_clause} {order_direction_clause}"
             )
             params: List[Any] = [isa]
 
@@ -429,7 +432,7 @@ class ISADatabase:
                 query += " LIMIT ?"
                 params.append(limit)
 
-            if offset:
+            if offset is not None:
                 query += " OFFSET ?"
                 params.append(offset)
 
@@ -469,7 +472,7 @@ class ISADatabase:
                 """
                 params = [query, isa, limit]
 
-                if offset:
+                if offset is not None:
                     base_query += " OFFSET ?"
                     params.append(offset)
 
@@ -484,7 +487,7 @@ class ISADatabase:
                 """
                 params = [query, limit]
 
-                if offset:
+                if offset is not None:
                     base_query += " OFFSET ?"
                     params.append(offset)
 
