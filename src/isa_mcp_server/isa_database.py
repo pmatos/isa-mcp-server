@@ -354,7 +354,11 @@ class ISADatabase:
                     instruction.isa_set,
                     instruction.description,
                     instruction.syntax,
-                    json.dumps([asdict(op) for op in instruction.operands] if instruction.operands else []),
+                    json.dumps(
+                        [asdict(op) for op in instruction.operands]
+                        if instruction.operands
+                        else []
+                    ),
                     json.dumps(
                         asdict(instruction.encoding) if instruction.encoding else None
                     ),

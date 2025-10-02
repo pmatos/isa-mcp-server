@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import AsyncGenerator, AsyncIterator, Iterator, List, Optional
+from typing import AsyncGenerator, List, Optional
 
 from ..isa_database import (
     EncodingRecord,
@@ -42,7 +42,9 @@ class XEDImporter(ISAImporter):
                 pass
         return None
 
-    async def parse_sources(self, source_dir: Path) -> AsyncGenerator[InstructionRecord, None]:
+    async def parse_sources(
+        self, source_dir: Path
+    ) -> AsyncGenerator[InstructionRecord, None]:
         """Parse XED source files and yield instruction records."""
         datafiles_dir = source_dir / "datafiles"
         if not datafiles_dir.exists():
@@ -100,7 +102,9 @@ class XEDImporter(ISAImporter):
                     async for instruction in self._process_file(isa_file):
                         yield instruction
 
-    async def _process_file(self, file_path: Path) -> AsyncGenerator[InstructionRecord, None]:
+    async def _process_file(
+        self, file_path: Path
+    ) -> AsyncGenerator[InstructionRecord, None]:
         """Process a single XED instruction file."""
         try:
             for xed_instruction in self.parser.parse_file(file_path):
