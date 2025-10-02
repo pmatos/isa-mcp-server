@@ -121,16 +121,15 @@ def validate_db_path(db_path: Union[str, Path]) -> Path:
 
 def _is_system_path(path: Path) -> bool:
     """Check if path is in a system directory that should be protected."""
-    path_str = os.path.normcase(str(path))
-    path_str_lower = path_str.lower()
+    # Use lowercase for case-insensitive comparison on all platforms
+    # This prevents bypass attacks like /Etc/passwd on case-sensitive filesystems
+    path_str = str(path).lower()
 
     # Check for Windows path patterns (even on non-Windows systems)
-    if ":" in path_str and (
-        "windows" in path_str_lower or "program files" in path_str_lower
-    ):
+    if ":" in path_str and ("windows" in path_str or "program files" in path_str):
         return True
 
-    # Common system directories to protect
+    # Common system directories to protect (all lowercase for comparison)
     system_dirs = [
         "/etc",
         "/usr",
@@ -150,7 +149,7 @@ def _is_system_path(path: Path) -> bool:
         "/root",
     ]
 
-    # Windows system directories (for Windows systems)
+    # Windows system directories (all lowercase for comparison)
     windows_dirs = [
         "c:\\windows",
         "c:\\program files",
@@ -162,9 +161,7 @@ def _is_system_path(path: Path) -> bool:
 
     all_system_dirs = system_dirs + windows_dirs
 
-    return any(
-        path_str.startswith(os.path.normcase(sys_dir)) for sys_dir in all_system_dirs
-    )
+    return any(path_str.startswith(sys_dir) for sys_dir in all_system_dirs)
 
 
 def _is_safe_absolute_path(path: Path) -> bool:
@@ -182,6 +179,9 @@ def _is_safe_absolute_path(path: Path) -> bool:
             pass
 
         # Allow common data directories
+        # WARNING: /tmp is included for testing convenience (pytest temp dirs)
+        # but carries security risks: world-writable, symlink attacks, TOCTOU.
+        # Production deployments should use more secure locations like home dir.
         safe_dirs = [
             Path("/tmp"),
             Path("/var/lib"),
