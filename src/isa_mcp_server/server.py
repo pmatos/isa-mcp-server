@@ -332,7 +332,8 @@ def _register_handlers(server: FastMCP):
             # Check if architecture exists in database
             supported_isas = server._db.get_supported_isas()  # type: ignore[attr-defined]
             if name not in supported_isas:
-                return f"Architecture '{name}' not found in database"
+                error_result = {"error": f"Architecture '{name}' not found in database"}
+                return json.dumps(error_result)
 
             # Get instruction count for this architecture
             instruction_count = server._db.get_instruction_count(name)  # type: ignore[attr-defined]
@@ -340,86 +341,75 @@ def _register_handlers(server: FastMCP):
             # Get architecture metadata from database
             architecture = server._db.get_architecture(name)  # type: ignore[attr-defined]
             if not architecture:
-                return f"Architecture '{name}' metadata not found in database"
+                error_result = {
+                    "error": f"Architecture '{name}' metadata not found in database"
+                }
+                return json.dumps(error_result)
 
             # Get registers and addressing modes
             registers = server._db.get_architecture_registers(name)  # type: ignore[attr-defined]
             addressing_modes = server._db.get_architecture_addressing_modes(name)  # type: ignore[attr-defined]
 
-            # Format register information
-            main_gprs = [
-                r for r in registers if r.is_main_register and r.register_class == "gpr"
-            ]
-            main_gpr_names = [r.register_name for r in main_gprs]
-
-            # Get other register classes
-            other_regs: dict[str, list[str]] = {}
+            # Group registers by class
+            register_groups: dict[str, list[str]] = {}
             for reg in registers:
-                if reg.register_class not in other_regs:
-                    other_regs[reg.register_class] = []
-                other_regs[reg.register_class].append(reg.register_name)
+                if reg.register_class not in register_groups:
+                    register_groups[reg.register_class] = []
+                register_groups[reg.register_class].append(reg.register_name)
 
             # Format addressing modes
-            mode_descriptions = []
+            mode_list = []
             for mode in addressing_modes:
+                mode_info = {"name": mode.mode_name}
                 if mode.example_syntax:
-                    mode_descriptions.append(
-                        f"{mode.mode_name} ({mode.example_syntax})"
-                    )
-                else:
-                    mode_descriptions.append(mode.mode_name)
+                    mode_info["example"] = mode.example_syntax
+                mode_list.append(mode_info)
 
-            # Build comprehensive architecture info
-            result = f"""Architecture: {name}
-Description: {architecture.description}
-Word Size: {architecture.word_size} bits
-Endianness: {architecture.endianness}
-Machine Mode: {architecture.machine_mode}
-"""
+            # Build comprehensive architecture info as JSON
+            result = {
+                "name": name,
+                "description": architecture.description,
+                "word_size": architecture.word_size,
+                "endianness": architecture.endianness,
+                "machine_mode": architecture.machine_mode,
+                "registers": register_groups,
+                "addressing_modes": mode_list,
+                "instruction_count": instruction_count,
+            }
 
-            if main_gpr_names:
-                result += f"General Purpose Registers: {', '.join(main_gpr_names)}\n"
-
-            # Add other register classes
-            for reg_class, reg_names in other_regs.items():
-                if reg_class != "gpr" and reg_names:
-                    class_name = reg_class.upper()
-                    if len(reg_names) > 8:  # Limit display for large register sets
-                        truncated = ", ".join(reg_names[:8])
-                        total_count = len(reg_names)
-                        result += (
-                            f"{class_name} Registers: {truncated} "
-                            f"... ({total_count} total)\n"
-                        )
-                    else:
-                        result += f"{class_name} Registers: {', '.join(reg_names)}\n"
-
-            if mode_descriptions:
-                result += f"Addressing Modes: {', '.join(mode_descriptions)}\n"
-
-            result += f"Instructions Available: {instruction_count}"
-
-            return result
+            return json.dumps(result)
         except Exception as e:
             logging.error(f"Failed to get architecture info: {e}")
-            return f"Error accessing architecture information: {e}"
+            error_result = {"error": f"Error accessing architecture information: {e}"}
+            return json.dumps(error_result)
 
     @server.resource("isa://instructions/{arch}")
     async def list_instructions(arch: str) -> str:
         """List instructions for a specific architecture."""
         try:
-            instructions = server._db.list_instructions(arch, limit=100)  # type: ignore[attr-defined]
+            instructions = server._db.list_instructions(arch)  # type: ignore[attr-defined]
 
             if instructions:
                 # Get unique mnemonics
                 mnemonics = list(set(instr.mnemonic for instr in instructions))
                 mnemonics.sort()
-                return "\n".join(f"- {instr}" for instr in mnemonics)
+                result = {
+                    "architecture": arch,
+                    "instruction_count": len(mnemonics),
+                    "instructions": mnemonics,
+                }
+                return json.dumps(result)
             else:
-                return f"No instructions found for architecture '{arch}'"
+                result = {
+                    "architecture": arch,
+                    "instruction_count": 0,
+                    "instructions": [],
+                }
+                return json.dumps(result)
         except Exception as e:
             logging.error(f"Failed to get instructions from database: {e}")
-            return f"Error accessing instructions for '{arch}': {e}"
+            error_result = {"error": f"Error accessing instructions for '{arch}': {e}"}
+            return json.dumps(error_result)
 
     @server.resource("isa://instruction/{arch}/{name}")
     async def get_instruction_info(arch: str, name: str) -> str:
@@ -434,26 +424,32 @@ Machine Mode: {architecture.machine_mode}
                 # Generate basic examples from syntax
                 examples = [f"{instruction.syntax}"]
 
-                flags_affected = (
-                    ", ".join(instruction.flags_affected)
+                # Build structured JSON response
+                result = {
+                    "mnemonic": instruction.mnemonic,
+                    "description": instruction.description,
+                    "syntax": instruction.syntax,
+                    "operands": operand_types,
+                    "flags_affected": instruction.flags_affected
                     if instruction.flags_affected
-                    else "None"
-                )
+                    else [],
+                    "category": instruction.category,
+                    "extension": instruction.extension,
+                    "examples": examples,
+                }
 
-                return f"""Instruction: {instruction.mnemonic}
-Description: {instruction.description}
-Syntax: {instruction.syntax}
-Operands: {", ".join(operand_types)}
-Flags Affected: {flags_affected}
-Category: {instruction.category}
-Extension: {instruction.extension}
-Examples:
-{chr(10).join(f"  {ex}" for ex in examples)}"""
+                return json.dumps(result)
             else:
-                return f"Instruction '{name}' not found for architecture '{arch}'"
+                error_result = {
+                    "error": f"Instruction '{name}' not found for architecture '{arch}'"
+                }
+                return json.dumps(error_result)
         except Exception as e:
             logging.error(f"Failed to get instruction from database: {e}")
-            return f"Error accessing instruction '{name}' for '{arch}': {e}"
+            error_result = {
+                "error": f"Error accessing instruction '{name}' for '{arch}': {e}"
+            }
+            return json.dumps(error_result)
 
     @server.resource("isa://architectures/{arch}/instruction-groups")
     async def get_instruction_groups(arch: str) -> str:
@@ -601,14 +597,21 @@ Examples:
                 results = []
                 for instr in instructions:
                     results.append(
-                        f"{instr.isa}: {instr.mnemonic} - {instr.description}"
+                        {
+                            "architecture": instr.isa,
+                            "mnemonic": instr.mnemonic,
+                            "description": instr.description,
+                        }
                     )
-                return "\n".join(results)
+                result = {"query": query, "count": len(results), "results": results}
+                return json.dumps(result)
             else:
-                return f"No instructions found matching '{query}'"
+                result = {"query": query, "count": 0, "results": []}
+                return json.dumps(result)
         except Exception as e:
             logging.error(f"Failed to search instructions in database: {e}")
-            return f"Error searching instructions: {e}"
+            error_result = {"error": f"Error searching instructions: {e}"}
+            return json.dumps(error_result)
 
     @server.tool("list_instructions_paginated")
     async def list_instructions_paginated(
